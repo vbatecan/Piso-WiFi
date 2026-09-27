@@ -31,6 +31,13 @@ A Python-based PISO WIFI management system designed for Orange Pi One that enabl
 
 - [📖 **Piso-WiFi Operator & Administrator User Manual**](docs/USER_MANUAL.md) — Comprehensive guide covering hardware topologies, Orange Pi / Raspberry Pi setup, Allan 1239 coin selector wiring, `.env` configuration, captive portal operation, bandwidth shaping, and troubleshooting.
 
+## Screenshots
+<img width="1791" height="902" alt="image" src="https://github.com/user-attachments/assets/b7fec1e2-3ef3-42b9-ac1a-9ada3d66fabb" />
+<img width="1793" height="886" alt="image" src="https://github.com/user-attachments/assets/1ba90ede-76c4-463d-b5a2-110b8555a582" />
+<img width="1790" height="900" alt="image" src="https://github.com/user-attachments/assets/7a70efc9-39e6-4d3c-9ea3-e551d0c0ea69" />
+<img width="1811" height="900" alt="image" src="https://github.com/user-attachments/assets/0edc74ff-ef1f-4758-99ca-6f01a8bc6101" />
+
+
 ## Architecture & Project Structure
 
 ```

@@ -4,139 +4,122 @@ A Python-based PISO WIFI management system designed for Orange Pi One that enabl
 
 ## Features
 
-- Pay-per-use WiFi access (1 peso = 5 minutes)
+- Pay-per-use WiFi access (1 peso = 1 minute default, configurable)
 - MAC address-based device tracking and access control
-- Web-based admin interface for:
-  - Viewing connected devices
-  - Managing user time balances
-  - Monitoring transactions
-- Automatic access blocking when time expires
-- Transaction history and reporting
-- Containerized development environment
-- Production-ready deployment for Orange Pi One
+- Bandwidth management with QoS traffic shaping (`default` vs `premium` plans)
+- Automatic access blocking when time balance depletes
+- Transaction logging and audit deduction history
+- Web-based management dashboard and admin panel
+- **Flexible Network Topologies (LAN-to-WLAN Production Standard)**:
+  - **Topology A (Ethernet WAN to Wireless AP)**: Connect ISP fiber/router via RJ-45 LAN cable (`eth0`) and broadcast hotspot via WiFi (`wlan0`). Delivers zero RF contention, full line-rate speeds, and carrier-drop detection.
+  - **Topology B (Dual Wireless WLAN-to-WLAN)**: Repeats upstream WiFi (`wlan1`) out to customer hotspot (`wlan0`).
+  - **Topology C (Cellular LTE-to-WLAN)**: 4G/5G USB modem dongle (`usb0`/`wwan0`) to WiFi (`wlan0`).
+  - **Smart Automatic Uplink Detection (`INTERNET_INTERFACE=auto`)**: Dynamically resolves default gateway routes and physical carrier state.
+- **Operator & Administrator Documentation**: Complete hardware wiring, deployment, and troubleshooting guide in the [**Piso-WiFi Operator & Administrator User Manual**](docs/USER_MANUAL.md).
+- **Modular OOP Architecture**:
+  - Strongly-typed Domain Models and Enums (`PlanType`, `UserStatus`, `DeductionType`, `DeviceSignalQuality`)
+  - Typed Configuration (`AppConfig`, `NetworkConfig`, `BandwidthConfig`)
+  - Thread-safe Database Repository pattern for SQLite (`DatabaseManager`, `UserRepository`)
+  - Pluggable Network Subsystem with Command Runner abstraction (`FirewallManager`, `TrafficShaper`, `AccessPointManager`, `DeviceDiscovery`, `NetworkController`)
+  - Separated Business Logic (`UserService`) and Background Session Loop (`TimeService`)
+  - Modern Flask Blueprints (`auth`, `dashboard`, `debug`) with Application Factory (`create_app`)
+- **100% Mockable Test Suite**: 96 unit and integration tests executable without root privileges or physical WiFi hardware
+- Containerized development environment (Docker Compose)
+- Production-ready deployment for Orange Pi One and Linux SBCs
 
-## System Requirements
+## Documentation & Manuals
 
-### Hardware
-- Orange Pi One or similar single board computer
-- WiFi adapter supporting AP mode
-- Power supply
-- Network connectivity
+- [📖 **Piso-WiFi Operator & Administrator User Manual**](docs/USER_MANUAL.md) — Comprehensive guide covering hardware topologies, Orange Pi / Raspberry Pi setup, Allan 1239 coin selector wiring, `.env` configuration, captive portal operation, bandwidth shaping, and troubleshooting.
 
-### Software
-- Python 3.9+
-- Docker and Docker Compose (for development)
-- Linux with hostapd and dnsmasq support
-- iptables for network access control
+## Architecture & Project Structure
 
-## Development Setup
+```
+Piso-WiFi/
+├── main.py                     # Application entrypoint & service orchestration
+├── docs/
+│   └── USER_MANUAL.md          # Comprehensive Operator & Administrator Manual
+├── user_manager.py             # Backward-compatibility facade -> UserService
+├── network_controller.py       # Backward-compatibility facade -> NetworkController
+├── time_manager.py             # Backward-compatibility facade -> TimeService
+├── requirements.txt            # Python dependencies
+├── Dockerfile                  # Container definition
+├── docker-compose.yml          # Containerized deployment
+├── templates/                  # Jinja2 HTML templates
+│   ├── base.html
+│   ├── index.html
+│   └── login.html
+├── piso_wifi/                  # Core modular package
+│   ├── config.py               # AppConfig, NetworkConfig, BandwidthConfig
+│   ├── models/
+│   │   ├── enums.py            # PlanType, UserStatus, DeductionType, SignalQuality
+│   │   └── entities.py         # User, Transaction, TimeLog, DeviceInfo, BandwidthLimit
+│   ├── database/
+│   │   ├── connection.py       # Thread-safe DatabaseManager connection manager
+│   │   └── repository.py       # UserRepository data access layer
+│   ├── network/
+│   │   ├── command_runner.py   # CommandRunner interface (System & Mock runners)
+│   │   ├── firewall.py         # FirewallManager (iptables NAT, forwarding, rules)
+│   │   ├── qos.py              # TrafficShaper / QoSManager (tc HTB / SFQ shaping)
+│   │   ├── access_point.py     # AccessPointManager (hostapd & dnsmasq configs)
+│   │   ├── discovery.py        # DeviceDiscovery (leases & station dumps)
+│   │   └── controller.py       # NetworkController facade with DI
+│   ├── services/
+│   │   ├── user_service.py     # UserService business logic & account operations
+│   │   └── time_service.py     # TimeService background daemon thread
+│   └── web/
+│       ├── app.py              # create_app Flask application factory
+│       ├── auth.py             # @admin_required authentication guard
+│       └── routes/
+│           ├── auth.py         # /login, /logout routes
+│           ├── dashboard.py    # /, /add_time, /deduct_time, /manage_plan, etc.
+│           └── debug.py        # /debug/connections diagnostics
+└── tests/
+    ├── test_network_controller.py
+    ├── test_network_modular.py
+    ├── test_repository.py
+    ├── test_time_service.py
+    ├── test_user_manager.py
+    └── test_web.py
+```
 
-### Prerequisites
+## Running & Testing
 
-- Python 3.9 or higher
-- Docker and Docker Compose installed
-- Git for version control
-- Linux environment (WSL2 for Windows users)
+### 1. Isolated Testing with `pytest` (Zero Root Required)
 
-### Quick Start
+All network interactions are decoupled and mockable:
 
-#### Option 1: Using Docker (Recommended)
+```bash
+# Run the complete test suite (90 tests)
+pytest
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/llTheBlankll/piso-wifi.git
-   cd piso-wifi
-   ```
+# Or run with Python module
+python3 -m pytest -v
+```
 
-2. Build the Docker image:
-   ```bash
-   # Build with default tag
-   docker build -t piso-wifi .
+### 2. Testing Without Installing Services (Mock Dev Mode)
 
-   # Or build with version tag
-   docker build -t piso-wifi:1.0 .
-   ```
+To explore and test the web dashboard without needing `hostapd`, `dnsmasq`, or root `iptables`:
 
-3. Verify the image was created:
-   ```bash
-   docker images | grep piso-wifi
-   ```
+```bash
+# Start in mock mode with uv (no clutter, isolated dependencies)
+MOCK_NETWORK=1 uv run python main.py
 
-4. Start the container using Docker Compose:
-   ```bash
-   # Start in detached mode
-   docker-compose up -d
+# Or with standard Python / virtualenv
+MOCK_NETWORK=1 python3 main.py
+```
+Open `http://localhost:5000` in your browser.
 
-   # Or start with logs visible
-   docker-compose up
-   ```
+### 3. Running with Docker Compose (Isolated Container)
 
-5. Verify the container is running:
-   ```bash
-   docker ps | grep piso-wifi
-   ```
+```bash
+# Start containerized Piso-WiFi
+docker compose up --build
 
-6. Check the logs:
-   ```bash
-   docker-compose logs -f
-   ```
+# Stop and clean up containers/volumes
+docker compose down -v
+```
 
-7. Access the application:
-   - Web interface: http://localhost:5000
-   - API endpoint: http://localhost:5000/api/v1
-
-8. Stop the container:
-   ```bash
-   docker-compose down
-   ```
-
-Common Docker Commands:
-- Rebuild after changes: `docker-compose up --build`
-- Remove containers and volumes: `docker-compose down -v`
-- View container logs: `docker-compose logs -f`
-- Shell access: `docker exec -it piso_wifi bash`
-- Check container status: `docker-compose ps`
-
-#### Option 2: Local Development Setup
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/llTheBlankll/piso-wifi.git
-   cd piso-wifi
-   ```
-
-2. Create and activate a virtual environment:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. Configure the environment:
-   ```bash
-   cp .env.example .env
-   # Edit .env file with your settings
-   ```
-
-5. Initialize the database:
-   ```bash
-   python manage.py init-db
-   ```
-
-6. Start the development server:
-   ```bash
-   python manage.py runserver
-   ```
-
-The admin interface will be available at `http://localhost:8000/admin`
-
-## Production Deployment
-
-### Orange Pi One Setup
+### 4. Production Hardware Deployment (Orange Pi / Linux SBC)
 
 1. Flash the latest Armbian OS to your Orange Pi One
 2. Install system dependencies:
@@ -159,13 +142,17 @@ The admin interface will be available at `http://localhost:8000/admin`
 
 ## Configuration
 
-Key configuration options in `.env`:
+Key configuration options in `.env` (see [User Manual Configuration Guide](docs/USER_MANUAL.md#section-3-configuration--deployment) for complete details):
 
-- `WIFI_INTERFACE`: Name of your WiFi interface (default: wlan0)
-- `AP_SSID`: WiFi network name
-- `AP_PASSWORD`: WiFi password for admin access
-- `RATE_PESOS_PER_MINUTE`: Cost rate (default: 0.2)
-- `DATABASE_URL`: SQLite database path
+- `WIFI_INTERFACE`: Wireless interface for hotspot broadcast (default: `wlan0`)
+- `INTERNET_INTERFACE`: Upstream WAN interface (`auto` for auto-detection, `eth0` for wired Ethernet, `wlan1` for WiFi repeater, `usb0` for LTE modem)
+- `AP_SSID`: Broadcast WiFi network name (default: `PisoWiFi`)
+- `AP_PASSWORD`: WiFi access password (default: `pisowifi123`)
+- `AP_IP`: Gateway IP address for captive portal (default: `192.168.4.1`)
+- `RATE_PESOS_PER_MINUTE`: Time conversion rate (default: `0.2` = 5 minutes per 1 Peso)
+- `ADMIN_USERNAME`: Administrator login username (default: `admin`)
+- `ADMIN_PASSWORD`: Administrator login password (default: `admin123`)
+- `DATABASE_URL`: SQLite database path (default: `sqlite:///config/piso_wifi.db`)
 
 ## API Documentation
 

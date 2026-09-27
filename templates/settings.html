@@ -582,14 +582,26 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    var hash = window.location.hash;
-    if (hash) {
-        var trigger = document.querySelector('button[data-bs-target="' + hash + '"]');
-        if (trigger) {
-            var tab = new bootstrap.Tab(trigger);
-            tab.show();
-        }
+    const triggers = Array.from(document.querySelectorAll('#settingsTabs button'));
+    triggers.forEach(trigger => {
+        const target = trigger.getAttribute('data-bs-target');
+        trigger.setAttribute('aria-controls', target.slice(1));
+        trigger.setAttribute('aria-selected', String(trigger.classList.contains('active')));
+        document.getElementById(target.slice(1)).setAttribute('aria-labelledby', trigger.id);
+        trigger.addEventListener('shown.bs.tab', () => {
+            history.replaceState(null, '', target);
+        });
+    });
+    const selected = triggers.find(trigger => trigger.getAttribute('data-bs-target') === window.location.hash);
+    if (selected && typeof bootstrap !== 'undefined') {
+        bootstrap.Tab.getOrCreateInstance(selected).show();
     }
+    document.querySelectorAll('#settingsTabContent input, #settingsTabContent select').forEach(field => {
+        if (!field.id && field.name) field.id = 'setting-' + field.name;
+        const group = field.closest('.input-group') || field;
+        const label = group.previousElementSibling;
+        if (label && label.tagName === 'LABEL') label.htmlFor = field.id;
+    });
 });
 
 function testDisplayHardware() {

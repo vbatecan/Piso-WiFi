@@ -105,7 +105,7 @@ class AnalyticsService:
                 cursor.execute("SELECT amount, COUNT(id) as cnt FROM transactions GROUP BY amount")
                 rows = cursor.fetchall()
                 for row in rows:
-                    amt = int(row["amount"]) if row["amount"] is not None else 0
+                    amt = float(row["amount"]) if row["amount"] is not None else 0.0
                     cnt = int(row["cnt"])
                     tot = amt * cnt
                     if amt == 1:

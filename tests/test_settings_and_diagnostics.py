@@ -118,6 +118,25 @@ def client(app):
     return app.test_client()
 
 
+@pytest.mark.parametrize("rate", ["0", "-1", "nan", "inf"])
+def test_invalid_rates_do_not_change_configuration(client, app, rate):
+    with client.session_transaction() as sess:
+        sess["is_admin"] = True
+    with patch("piso_wifi.web.routes.settings.save_env_file") as save:
+        client.post("/settings/rates", data={"minutes_per_peso": rate})
+    save.assert_not_called()
+    assert app.config["CONFIG"].minutes_per_peso == 5.0
+
+
+def test_invalid_password_does_not_change_username(client, app):
+    with client.session_transaction() as sess:
+        sess["is_admin"] = True
+    with patch("piso_wifi.web.routes.settings.save_env_file") as save:
+        client.post("/settings/admin", data={"admin_username": "changed", "admin_password": "longpassword", "admin_password_confirm": "mismatch"})
+    save.assert_not_called()
+    assert app.config["CONFIG"].admin_username == "admin"
+
+
 def test_settings_requires_admin(client):
     """Test that accessing /settings without admin login redirects."""
     response = client.get("/settings", follow_redirects=False)

@@ -23,7 +23,7 @@
     <div class="col-6 col-lg-3">
         <div class="card shadow-sm border-0 bg-primary text-white h-100">
             <div class="card-body p-3 p-md-4">
-                <small class="text-white-50 text-uppercase fw-semibold d-block">Today (Last 24h)</small>
+                <small class="text-white-50 text-uppercase fw-semibold d-block">Last 24 Hours</small>
                 <h3 class="fw-bold my-1">₱{{ "%.2f"|format(today.total_revenue) }}</h3>
                 <small class="text-white-50">{{ today.total_transactions }} transactions</small>
             </div>
@@ -32,7 +32,7 @@
     <div class="col-6 col-lg-3">
         <div class="card shadow-sm border-0 bg-info text-dark h-100">
             <div class="card-body p-3 p-md-4">
-                <small class="text-dark-50 text-uppercase fw-semibold d-block">This Week (Last 7d)</small>
+                <small class="text-uppercase fw-semibold d-block">Last 7 Days</small>
                 <h3 class="fw-bold my-1">₱{{ "%.2f"|format(week.total_revenue) }}</h3>
                 <small class="text-muted">{{ week.total_transactions }} transactions</small>
             </div>
@@ -41,7 +41,7 @@
     <div class="col-6 col-lg-3">
         <div class="card shadow-sm border-0 bg-success text-white h-100">
             <div class="card-body p-3 p-md-4">
-                <small class="text-white-50 text-uppercase fw-semibold d-block">This Month (30d)</small>
+                <small class="text-white-50 text-uppercase fw-semibold d-block">Last 30 Days</small>
                 <h3 class="fw-bold my-1">₱{{ "%.2f"|format(month.total_revenue) }}</h3>
                 <small class="text-white-50">{{ month.total_transactions }} transactions</small>
             </div>
@@ -63,48 +63,55 @@
     <div class="col-lg-7">
         <div class="card shadow-sm border-0 h-100">
             <div class="card-header bg-white border-0 py-3">
-                <h5 class="mb-0 fw-bold"><i class="bi bi-pie-chart text-primary me-2"></i>Coin Breakdown by Denomination</h5>
+                <h5 class="mb-0 fw-bold"><i class="bi bi-pie-chart text-primary me-2"></i>Revenue by Transaction Amount</h5>
             </div>
             <div class="card-body p-4 pt-0">
+                <p class="text-muted small">All-time totals grouped by payment amount; a payment may include multiple coins.</p>
+                <div class="chart-container mb-3">
+                    <canvas id="denominationChart" role="img" aria-label="All-time revenue by transaction amount"></canvas>
+                </div>
+                <p id="denominationEmpty" class="text-muted small" hidden>No revenue recorded yet.</p>
                 <div class="row g-3 text-center">
                     <div class="col-6 col-sm-3">
                         <div class="p-3 bg-light rounded-3 border">
-                            <h6 class="fw-bold text-primary mb-1">₱1 Coins</h6>
+                            <h6 class="fw-bold text-primary mb-1">₱1 Payments</h6>
                             <h4 class="fw-bold mb-0">{{ denominations.p1.count }}</h4>
                             <small class="text-muted">₱{{ "%.2f"|format(denominations.p1.total_pesos) }}</small>
                         </div>
                     </div>
                     <div class="col-6 col-sm-3">
                         <div class="p-3 bg-light rounded-3 border">
-                            <h6 class="fw-bold text-success mb-1">₱5 Coins</h6>
+                            <h6 class="fw-bold text-success mb-1">₱5 Payments</h6>
                             <h4 class="fw-bold mb-0">{{ denominations.p5.count }}</h4>
                             <small class="text-muted">₱{{ "%.2f"|format(denominations.p5.total_pesos) }}</small>
                         </div>
                     </div>
                     <div class="col-6 col-sm-3">
                         <div class="p-3 bg-light rounded-3 border">
-                            <h6 class="fw-bold text-warning mb-1">₱10 Coins</h6>
+                            <h6 class="fw-bold text-warning mb-1">₱10 Payments</h6>
                             <h4 class="fw-bold mb-0">{{ denominations.p10.count }}</h4>
                             <small class="text-muted">₱{{ "%.2f"|format(denominations.p10.total_pesos) }}</small>
                         </div>
                     </div>
                     <div class="col-6 col-sm-3">
                         <div class="p-3 bg-light rounded-3 border">
-                            <h6 class="fw-bold text-danger mb-1">₱20 Coins</h6>
+                            <h6 class="fw-bold text-danger mb-1">₱20 Payments</h6>
                             <h4 class="fw-bold mb-0">{{ denominations.p20.count }}</h4>
                             <small class="text-muted">₱{{ "%.2f"|format(denominations.p20.total_pesos) }}</small>
                         </div>
                     </div>
                 </div>
 
+                <p class="text-muted small mt-3 mb-0">Other payments: {{ denominations.other.count }} · ₱{{ "%.2f"|format(denominations.other.total_pesos) }}</p>
+
                 <!-- Webhook Alert Configuration -->
                 <div class="mt-4 pt-3 border-top">
                     <h6 class="fw-bold mb-2"><i class="bi bi-bell me-1"></i> Operator Notifications (Telegram / Discord)</h6>
                     <div class="input-group">
-                        <input type="text" id="webhookInput" class="form-control font-monospace small" placeholder="Discord or Telegram Webhook URL">
+                        <input type="url" id="webhookInput" aria-label="Notification webhook URL" class="form-control font-monospace small" placeholder="Discord or Telegram Webhook URL">
                         <button type="button" class="btn btn-outline-primary" onclick="testWebhook()">Test Webhook</button>
                     </div>
-                    <div id="webhookResult" class="small mt-2"></div>
+                    <div id="webhookResult" class="small mt-2" role="status"></div>
                 </div>
             </div>
         </div>
@@ -114,31 +121,19 @@
     <div class="col-lg-5">
         <div class="card shadow-sm border-0 h-100">
             <div class="card-header bg-white border-0 py-3">
-                <h5 class="mb-0 fw-bold"><i class="bi bi-clock-history text-primary me-2"></i>Peak Hours Activity (24h)</h5>
+                <h5 class="mb-0 fw-bold"><i class="bi bi-clock-history text-primary me-2"></i>Revenue by Hour</h5>
             </div>
             <div class="card-body p-4 pt-0">
-                <p class="text-muted small mb-3">Gross revenue distribution by hour of the day.</p>
-                <div class="d-flex align-items-end justify-content-between bg-light p-3 rounded" style="height: 180px;">
-                    {% set max_val = 1 %}
-                    {% for h, val in hourly.items() %}
-                        {% if val > max_val %}{% set max_val = val %}{% endif %}
-                    {% endfor %}
-                    {% for h in range(24) %}
-                        {% set h_val = hourly.get(h, 0.0) %}
-                        {% set pct = (h_val / max_val * 100) if max_val > 0 else 0 %}
-                        <div class="d-flex flex-column align-items-center" style="width: 3.5%;" title="{{ '%02d:00'|format(h) }}: ₱{{ h_val }}">
-                            <div class="w-100 bg-primary rounded-top" style="height: {{ [pct|int, 5]|max }}px;"></div>
-                            <span style="font-size: 0.55rem;" class="text-muted mt-1">{{ h if h % 3 == 0 else '' }}</span>
-                        </div>
-                    {% endfor %}
+                <p class="text-muted small mb-3">All-time gross revenue grouped by recorded hour of day.</p>
+                <div class="chart-container">
+                    <canvas id="hourlyChart" role="img" aria-label="All-time revenue for each hour of the day"></canvas>
                 </div>
-                <div class="d-flex justify-content-between text-muted small mt-2">
-                    <span>12 AM</span>
-                    <span>6 AM</span>
-                    <span>12 PM</span>
-                    <span>6 PM</span>
-                    <span>11 PM</span>
-                </div>
+                <p id="hourlyEmpty" class="text-muted small mt-3" hidden>No hourly revenue recorded yet.</p>
+                <details class="mt-3 small"><summary>View hourly totals</summary>
+                    <table class="table table-sm"><thead><tr><th>Hour</th><th>Revenue</th></tr></thead><tbody>
+                    {% for h in range(24) %}<tr><td>{{ '%02d:00'|format(h) }}</td><td>₱{{ '%.2f'|format(hourly.get(h, 0)) }}</td></tr>{% endfor %}
+                    </tbody></table>
+                </details>
             </div>
         </div>
     </div>
@@ -182,7 +177,46 @@
     </div>
 </div>
 
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
 <script>
+    const hourlyRevenue = {{ hourly|tojson }};
+    const breakdown = {{ denominations|tojson }};
+    const amounts = Object.values(breakdown).map(item => item.total_pesos);
+    const hourlyValues = Array.from({length: 24}, (_, hour) => hourlyRevenue[hour] || 0);
+    document.getElementById('denominationEmpty').hidden = amounts.some(value => value > 0);
+    document.getElementById('hourlyEmpty').hidden = hourlyValues.some(value => value > 0);
+    if (typeof Chart !== 'undefined') {
+        Chart.defaults.color = '#44505c';
+        const peso = new Intl.NumberFormat('en-PH', {style: 'currency', currency: 'PHP'});
+        new Chart(document.getElementById('denominationChart'), {
+            type: 'doughnut',
+            data: {labels: ['₱1', '₱5', '₱10', '₱20', 'Other'], datasets: [{data: amounts,
+                backgroundColor: ['#175cd3', '#157347', '#856000', '#b02a37', '#59636e']}]},
+            options: {responsive: true, maintainAspectRatio: false, animation: false,
+                plugins: {legend: {position: 'bottom'}, tooltip: {callbacks: {
+                    label: context => context.label + ': ' + peso.format(context.raw)
+                }}}}
+        });
+        new Chart(document.getElementById('hourlyChart'), {
+            type: 'bar',
+            data: {labels: Array.from({length: 24}, (_, hour) => String(hour).padStart(2, '0') + ':00'),
+                datasets: [{label: 'Revenue', data: hourlyValues, backgroundColor: '#175cd3', borderRadius: 4}]},
+            options: {responsive: true, maintainAspectRatio: false, animation: false,
+                scales: {x: {grid: {display: false}, ticks: {maxTicksLimit: 8}},
+                    y: {beginAtZero: true, ticks: {callback: value => peso.format(value)}}},
+                plugins: {legend: {display: false}, tooltip: {callbacks: {
+                    label: context => peso.format(context.raw)
+                }}}}
+        });
+    } else {
+        document.querySelectorAll('.chart-container').forEach(container => {
+            container.textContent = 'Charts could not load. Revenue totals remain available below.';
+            container.classList.add('text-muted');
+        });
+    }
     async function testWebhook() {
         const url = document.getElementById('webhookInput').value.trim();
         const resEl = document.getElementById('webhookResult');

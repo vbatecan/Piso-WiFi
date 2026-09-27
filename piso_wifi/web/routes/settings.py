@@ -1,6 +1,7 @@
 """Settings and centralized web configuration portal for Piso-WiFi."""
 
 import logging
+import math
 import os
 from typing import Any, Dict, List, Optional
 from flask import (
@@ -150,6 +151,11 @@ def update_rates():
         premium_down = int(request.form.get("premium_download_kbps", 8096) or 8096)
         premium_up = int(request.form.get("premium_upload_kbps", 8096) or 8096)
 
+        if not math.isfinite(minutes_per_peso) or minutes_per_peso <= 0:
+            raise ValueError("Minutes per peso must be a positive finite number.")
+        if min(default_down, default_up, premium_down, premium_up) <= 0:
+            raise ValueError("Bandwidth limits must be positive.")
+
         env_updates = {
             "RATE_PESOS_PER_MINUTE": str(rate_pesos_per_min),
             "DEFAULT_DOWNLOAD_SPEED": str(default_down),
@@ -160,6 +166,9 @@ def update_rates():
         save_env_file(env_updates)
 
         app_config.minutes_per_peso = minutes_per_peso
+        coin_service = current_app.config.get("COIN_SERVICE")
+        if coin_service is not None:
+            coin_service.minutes_per_peso = minutes_per_peso
         app_config.network.bandwidth.default_download_kbps = default_down
         app_config.network.bandwidth.default_upload_kbps = default_up
         app_config.network.bandwidth.premium_download_kbps = premium_down
@@ -169,7 +178,7 @@ def update_rates():
     except ValueError as e:
         flash(f"Invalid numeric input for rates or bandwidth: {e}", "error")
 
-    return redirect(url_for("settings.index"))
+    return redirect(url_for("settings.index", _anchor="tab-rates"))
 
 
 @settings_bp.route("/settings/coin_slot", methods=["POST"])
@@ -240,8 +249,6 @@ def update_admin():
         return redirect(url_for("settings.index"))
 
     updates: Dict[str, Any] = {"ADMIN_USERNAME": username}
-    app_config.admin_username = username
-    current_app.config["ADMIN_USERNAME"] = username
 
     if password:
         if len(password) < 4:
@@ -256,6 +263,8 @@ def update_admin():
         current_app.config["ADMIN_PASSWORD"] = password
 
     save_env_file(updates)
+    app_config.admin_username = username
+    current_app.config["ADMIN_USERNAME"] = username
     flash("Admin security credentials updated successfully.", "success")
     return redirect(url_for("settings.index"))
 

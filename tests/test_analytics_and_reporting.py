@@ -84,6 +84,15 @@ def test_analytics_denomination_breakdown(temp_db_with_transactions):
     assert breakdown["p20"]["total_pesos"] == 20.0
 
 
+def test_fractional_payments_preserve_revenue(temp_db_with_transactions):
+    with sqlite3.connect(temp_db_with_transactions) as conn:
+        conn.execute("INSERT INTO transactions (user_id, amount, minutes) VALUES (1, 1.5, 7)")
+    breakdown = AnalyticsService(db_path=temp_db_with_transactions).get_denomination_breakdown()
+    assert breakdown["p1"]["count"] == 1
+    assert breakdown["other"]["total_pesos"] == 1.5
+    assert sum(item["total_pesos"] for item in breakdown.values()) == 37.5
+
+
 def test_analytics_hourly_and_csv_export(temp_db_with_transactions):
     """Test hourly revenue calculation and CSV export formatting."""
     service = AnalyticsService(db_path=temp_db_with_transactions)
@@ -149,7 +158,7 @@ def test_reports_web_routes(app_with_analytics):
     html = res.get_data(as_text=True)
     assert "Sales &amp; Revenue Analytics" in html or "Sales & Revenue Analytics" in html
     assert "All-Time Revenue" in html
-    assert "₱1 Coins" in html
+    assert "₱1 Payments" in html
 
     # 2. JSON summary API
     res_sum = client.get("/api/reports/summary?period=all")

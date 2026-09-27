@@ -2,3 +2,7 @@
 config/piso_wifi.db
 venv
 .env
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.codegraph/

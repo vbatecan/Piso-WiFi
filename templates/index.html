@@ -5,6 +5,160 @@
 {% block content %}
 <div class="row">
     <div class="col-md-12">
+        <!-- WAN Uplink Status Diagnostics Banner/Card -->
+        {% if uplink_info %}
+        <div class="card mb-4 border-0 shadow-sm bg-light">
+            <div class="card-body p-3 p-md-4">
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+                    <div class="d-flex align-items-center">
+                        <span class="fs-4 me-2">🌐</span>
+                        <h4 class="mb-0 fw-bold">WAN Uplink Diagnostics</h4>
+                    </div>
+                    <div>
+                        {% set status_val = (uplink_info.status or uplink_info.carrier_status or uplink_info.link_status or 'Online')|string %}
+                        {% if status_val|lower in ['online', 'connected', 'active', 'up'] %}
+                            <span class="badge bg-success fs-6 px-3 py-2">
+                                <span class="spinner-grow spinner-grow-sm me-1" role="status" aria-hidden="true" style="width: 0.5rem; height: 0.5rem;"></span>
+                                {{ status_val|capitalize }}
+                            </span>
+                        {% else %}
+                            <span class="badge bg-danger fs-6 px-3 py-2">{{ status_val|capitalize }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-6 col-md-3">
+                        <div class="p-2 border rounded bg-white h-100">
+                            <small class="text-muted text-uppercase fw-semibold d-block" style="font-size: 0.75rem;">WAN Interface</small>
+                            <span class="fs-6 fw-bold text-dark font-monospace">{{ uplink_info.interface or uplink_info.wan_interface or uplink_info.internet_interface or 'eth0' }}</span>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-2 border rounded bg-white h-100">
+                            <small class="text-muted text-uppercase fw-semibold d-block" style="font-size: 0.75rem;">Connection Type</small>
+                            <span class="fs-6 fw-bold text-dark">{{ uplink_info.connection_type or uplink_info.type or 'Wired LAN' }}</span>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-2 border rounded bg-white h-100">
+                            <small class="text-muted text-uppercase fw-semibold d-block" style="font-size: 0.75rem;">IP Address</small>
+                            <span class="fs-6 fw-bold text-dark font-monospace">{{ uplink_info.ip_address or uplink_info.ip or 'Unknown' }}</span>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-2 border rounded bg-white h-100">
+                            <small class="text-muted text-uppercase fw-semibold d-block" style="font-size: 0.75rem;">Default Gateway</small>
+                            <span class="fs-6 fw-bold text-dark font-monospace">{{ uplink_info.gateway or uplink_info.default_gateway or 'Unknown' }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% if uplink_info.carrier or uplink_info.carrier_status or uplink_info.link_status %}
+                <div class="mt-2 text-muted small">
+                    <strong>Carrier/Link Status:</strong> <span class="badge bg-secondary">{{ uplink_info.carrier or uplink_info.carrier_status or uplink_info.link_status or 'Active' }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Customer Captive Portal Hero Card -->
+        <div class="card mb-4 border-0 shadow rounded-4 overflow-hidden" id="customerPortalCard" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white;">
+            <div class="card-body p-4 p-md-5 text-center">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span class="badge bg-light text-dark px-3 py-2 font-monospace">
+                        <i class="bi bi-phone me-1"></i>
+                        <span id="displayClientMac">{{ client_info.mac if client_info and client_info.mac != 'UNKNOWN' else 'Device Detected' }}</span>
+                    </span>
+                    <span class="badge {% if client_info and client_info.status == 'active' %}bg-success{% elif client_info and client_info.status == 'paused' %}bg-warning text-dark{% else %}bg-danger{% endif %} px-3 py-2 fs-6 text-uppercase" id="statusBadge">
+                        {{ client_info.status if client_info else 'Inactive' }}
+                    </span>
+                </div>
+
+                <h1 class="display-3 fw-bold my-3 font-monospace tracking-wide" id="timeCountdown">00:00:00</h1>
+                <p class="text-white-50 fs-6 mb-4">Remaining Internet Time Balance</p>
+
+                <div class="d-flex flex-wrap justify-content-center gap-3">
+                    <button type="button" class="btn btn-warning btn-lg px-4 py-3 fw-bold shadow-sm" onclick="openInsertCoinModal()">
+                        <i class="bi bi-coin me-2"></i> Insert Coin
+                    </button>
+
+                    {% if client_info and client_info.status == 'paused' %}
+                    <button type="button" class="btn btn-success btn-lg px-4 py-3 fw-bold shadow-sm" id="btnPauseResume" onclick="togglePauseResume(true)">
+                        <i class="bi bi-play-circle me-2"></i> Resume Time
+                    </button>
+                    {% else %}
+                    <button type="button" class="btn btn-outline-light btn-lg px-4 py-3 fw-bold shadow-sm" id="btnPauseResume" onclick="togglePauseResume(false)">
+                        <i class="bi bi-pause-circle me-2"></i> Pause Time
+                    </button>
+                    {% endif %}
+
+                    <button type="button" class="btn btn-outline-light btn-lg px-4 py-3 fw-bold shadow-sm" onclick="openVoucherModal()">
+                        <i class="bi bi-ticket-perforated me-2"></i> Redeem Voucher
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Insert Coin Modal -->
+        <div class="modal fade" id="insertCoinModal" tabindex="-1" aria-labelledby="insertCoinModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content text-dark border-0 shadow">
+                    <div class="modal-header bg-warning text-dark">
+                        <h5 class="modal-title fw-bold" id="insertCoinModalLabel">
+                            <i class="bi bi-coin me-2"></i> Insert Coins Now
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onclick="cancelCoinSession()"></button>
+                    </div>
+                    <div class="modal-body text-center p-4">
+                        <div class="mb-3">
+                            <span class="fs-1 fw-bold text-danger font-monospace" id="coinCountdownTimer">60s</span>
+                            <div class="text-muted small">Seconds Remaining to Drop Coins</div>
+                        </div>
+
+                        <div class="p-3 bg-light rounded-3 border mb-3">
+                            <div class="text-uppercase small text-muted fw-bold mb-1">Coins Deposited This Session</div>
+                            <h2 class="fw-bold text-success mb-0">₱<span id="sessionPesos">0</span></h2>
+                            <small class="text-muted font-monospace"><span id="sessionPulses">0</span> pulses detected</small>
+                        </div>
+
+                        <div class="alert alert-info py-2 small mb-0">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Accepted denominations: <strong>₱1, ₱5, ₱10, ₱20</strong>. Multi-drop supported.
+                        </div>
+                    </div>
+                    <div class="modal-footer justify-content-between">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" onclick="cancelCoinSession()">Done / Close</button>
+                        <span class="text-success small fw-bold" id="coinFeedbackMsg">Coin slot active...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Redeem Voucher Modal -->
+        <div class="modal fade" id="voucherModal" tabindex="-1" aria-labelledby="voucherModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content text-dark border-0 shadow">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title fw-bold" id="voucherModalLabel">
+                            <i class="bi bi-ticket-perforated me-2"></i> Redeem Time Voucher
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Enter Voucher Code:</label>
+                            <input type="text" id="voucherCodeInput" class="form-control form-control-lg font-monospace text-uppercase text-center" placeholder="e.g. A1B2C3D4" maxlength="16">
+                        </div>
+                        <div id="voucherAlertMsg" class="d-none alert py-2 small"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" onclick="submitVoucherRedemption()">Redeem Code</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <h2>Connected Devices</h2>
         <table class="table table-striped">
             <thead>
@@ -72,6 +226,19 @@
                             {% endif %}
 
                             {% if is_admin %}
+                            <form action="/set_bandwidth" method="POST" class="mt-2">
+                                <input type="hidden" name="mac_address" value="{{ device.mac_address }}">
+                                <div class="input-group input-group-sm mb-1" style="width: 150px;">
+                                    <span class="input-group-text">↓</span>
+                                    <input type="number" name="download" value="{{ device.download_limit }}" class="form-control" placeholder="Down">
+                                </div>
+                                <div class="input-group input-group-sm mb-1" style="width: 150px;">
+                                    <span class="input-group-text">↑</span>
+                                    <input type="number" name="upload" value="{{ device.upload_limit }}" class="form-control" placeholder="Up">
+                                </div>
+                                <button type="submit" class="btn btn-sm btn-secondary">Set Bandwidth</button>
+                            </form>
+
                             <form action="/manage_plan" method="POST" class="mt-2">
                                 <input type="hidden" name="mac_address" value="{{ device.mac_address }}">
                                 <select name="plan" class="form-select d-inline" style="width: 150px;">
@@ -89,4 +256,151 @@
         </table>
     </div>
 </div>
+
+<script>
+    let remainingSeconds = Math.max(0, Math.floor({{ client_info.time_balance|default(0.0) }} * 60));
+    let clientStatus = "{{ client_info.status|default('inactive') }}";
+    let clientMac = "{{ client_info.mac|default('') }}";
+    let coinPollInterval = null;
+
+    function formatTime(totalSec) {
+        if (totalSec <= 0) return "00:00:00";
+        const h = Math.floor(totalSec / 3600);
+        const m = Math.floor((totalSec % 3600) / 60);
+        const s = totalSec % 60;
+        return String(h).padStart(2, '0') + ":" + String(m).padStart(2, '0') + ":" + String(s).padStart(2, '0');
+    }
+
+    function updateCountdownDisplay() {
+        const el = document.getElementById("timeCountdown");
+        if (el) el.innerText = formatTime(remainingSeconds);
+    }
+
+    // Ticking timer
+    updateCountdownDisplay();
+    setInterval(() => {
+        if (clientStatus === "active" && remainingSeconds > 0) {
+            remainingSeconds--;
+            updateCountdownDisplay();
+            if (remainingSeconds <= 0) {
+                clientStatus = "expired";
+                const badge = document.getElementById("statusBadge");
+                if (badge) {
+                    badge.className = "badge bg-danger px-3 py-2 fs-6 text-uppercase";
+                    badge.innerText = "Expired";
+                }
+            }
+        }
+    }, 1000);
+
+    // Insert Coin modal & live session polling
+    async function openInsertCoinModal() {
+        const modalEl = document.getElementById('insertCoinModal');
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+
+        try {
+            const res = await fetch('/api/coin/insert_coin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mac_address: clientMac })
+            }).then(r => r.json());
+
+            if (res.success) {
+                startCoinPolling();
+            }
+        } catch (e) {
+            console.error('Error starting coin session:', e);
+        }
+    }
+
+    function startCoinPolling() {
+        if (coinPollInterval) clearInterval(coinPollInterval);
+        coinPollInterval = setInterval(async () => {
+            try {
+                const res = await fetch('/api/coin/session').then(r => r.json());
+                if (res.success && res.has_active_session && res.session) {
+                    document.getElementById('coinCountdownTimer').innerText = res.session.remaining_seconds + "s";
+                    document.getElementById('sessionPesos').innerText = res.session.accumulated_pesos || 0;
+                    document.getElementById('sessionPulses').innerText = (res.session.accumulated_pesos || 0);
+                    if (res.session.remaining_seconds <= 0) {
+                        clearInterval(coinPollInterval);
+                        setTimeout(() => location.reload(), 1500);
+                    }
+                } else if (!res.has_active_session) {
+                    clearInterval(coinPollInterval);
+                }
+            } catch (e) {
+                console.error('Polling error:', e);
+            }
+        }, 1000);
+    }
+
+    async function cancelCoinSession() {
+        if (coinPollInterval) clearInterval(coinPollInterval);
+        try {
+            await fetch('/api/coin/cancel_session', { method: 'POST' });
+        } catch (e) {}
+        // Refresh portal status
+        location.reload();
+    }
+
+    // Pause / Resume
+    async function togglePauseResume(isCurrentlyPaused) {
+        const endpoint = isCurrentlyPaused ? '/api/portal/resume' : '/api/portal/pause';
+        try {
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mac_address: clientMac })
+            }).then(r => r.json());
+
+            if (res.success) {
+                location.reload();
+            } else {
+                alert(res.error || 'Operation failed');
+            }
+        } catch (e) {
+            alert('Request error: ' + e);
+        }
+    }
+
+    // Voucher Redemption
+    function openVoucherModal() {
+        const modal = new bootstrap.Modal(document.getElementById('voucherModal'));
+        document.getElementById('voucherCodeInput').value = '';
+        document.getElementById('voucherAlertMsg').className = 'd-none alert py-2 small';
+        modal.show();
+    }
+
+    async function submitVoucherRedemption() {
+        const code = document.getElementById('voucherCodeInput').value.trim();
+        const alertBox = document.getElementById('voucherAlertMsg');
+        if (!code) {
+            alertBox.className = 'alert alert-danger py-2 small';
+            alertBox.innerText = 'Please enter a voucher code.';
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/portal/redeem-voucher', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: code, mac_address: clientMac })
+            }).then(r => r.json());
+
+            if (res.success) {
+                alertBox.className = 'alert alert-success py-2 small';
+                alertBox.innerText = 'Success! Added ' + res.time_minutes + ' minutes.';
+                setTimeout(() => location.reload(), 1200);
+            } else {
+                alertBox.className = 'alert alert-danger py-2 small';
+                alertBox.innerText = res.error || 'Failed to redeem voucher.';
+            }
+        } catch (e) {
+            alertBox.className = 'alert alert-danger py-2 small';
+            alertBox.innerText = 'Network error: ' + e;
+        }
+    }
+</script>
 {% endblock %} 

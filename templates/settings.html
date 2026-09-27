@@ -1,0 +1,609 @@
+{% extends "base.html" %}
+
+{% block title %}Configurations & Settings{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="fw-bold mb-1"><i class="bi bi-sliders text-primary me-2"></i>System Configurations</h2>
+        <p class="text-muted mb-0">Manage network interfaces, wireless hotspot, coin rates, and security credentials directly from the web.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('diagnostics.index') }}" class="btn btn-outline-primary">
+            <i class="bi bi-activity me-1"></i> Live Diagnostics
+        </a>
+        <form action="{{ url_for('settings.apply_network_services') }}" method="POST" class="d-inline" onsubmit="return confirm('Restart WiFi Access Point and apply current firewall rules? Connected clients will temporarily reconnect.');">
+            <button type="submit" class="btn btn-warning text-dark">
+                <i class="bi bi-arrow-clockwise me-1"></i> Restart Hotspot & Apply
+            </button>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-white border-bottom p-0">
+        <ul class="nav nav-tabs card-header-tabs m-0 px-3 pt-2" id="settingsTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active fw-semibold" id="tab-network-btn" data-bs-toggle="tab" data-bs-target="#tab-network" type="button" role="tab">
+                    <i class="bi bi-wifi me-1"></i> Network & Hotspot
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link fw-semibold" id="tab-rates-btn" data-bs-toggle="tab" data-bs-target="#tab-rates" type="button" role="tab">
+                    <i class="bi bi-cash-coin me-1"></i> Rates & Bandwidth
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link fw-semibold" id="tab-coin-btn" data-bs-toggle="tab" data-bs-target="#tab-coin" type="button" role="tab">
+                    <i class="bi bi-cpu me-1"></i> Coin Slot Hardware
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link fw-semibold" id="tab-admin-btn" data-bs-toggle="tab" data-bs-target="#tab-admin" type="button" role="tab">
+                    <i class="bi bi-shield-lock me-1"></i> Admin Security
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link fw-semibold" id="tab-vouchers-btn" data-bs-toggle="tab" data-bs-target="#tab-vouchers" type="button" role="tab">
+                    <i class="bi bi-ticket-perforated me-1"></i> Vouchers
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link fw-semibold" id="tab-backups-btn" data-bs-toggle="tab" data-bs-target="#tab-backups" type="button" role="tab">
+                    <i class="bi bi-cloud-arrow-up me-1"></i> Backups
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link fw-semibold" id="tab-peripherals-btn" data-bs-toggle="tab" data-bs-target="#tab-peripherals" type="button" role="tab">
+                    <i class="bi bi-display me-1"></i> Peripherals
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link fw-semibold" id="tab-system-btn" data-bs-toggle="tab" data-bs-target="#tab-system" type="button" role="tab">
+                    <i class="bi bi-gear me-1"></i> System Operations
+                </button>
+            </li>
+        </ul>
+    </div>
+
+
+    <div class="card-body p-4">
+        <div class="tab-content" id="settingsTabContent">
+            <!-- TAB 1: Network & Hotspot -->
+            <div class="tab-pane fade show active" id="tab-network" role="tabpanel">
+                <form action="{{ url_for('settings.update_network') }}" method="POST">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">WiFi Hotspot (AP) Interface:</label>
+                            <select class="form-select font-monospace" name="wifi_interface">
+                                {% for iface in interfaces %}
+                                    <option value="{{ iface.name }}" {% if iface.name == config.network.ap_interface %}selected{% endif %}>
+                                        {{ iface.name }} ({% if iface.is_wireless %}Wireless{% else %}Wired{% endif %}{% if iface.supports_ap %} &bull; AP Mode Ready{% endif %})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">Hardware interface broadcasting the captive portal hotspot.</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Internet Uplink (WAN) Interface:</label>
+                            <select class="form-select font-monospace" name="internet_interface">
+                                <option value="auto" {% if config.network.internet_interface == 'auto' or not config.network.internet_interface %}selected{% endif %}>
+                                    auto (Auto-detect default internet route)
+                                </option>
+                                {% for iface in interfaces %}
+                                    <option value="{{ iface.name }}" {% if iface.name == config.network.internet_interface %}selected{% endif %}>
+                                        {{ iface.name }} ({% if iface.is_wireless %}Wireless{% else %}Wired{% endif %}{% if iface.is_default_uplink %} &bull; Default Gateway{% endif %})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">Interface providing upstream internet connectivity to clients.</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Hotspot SSID (WiFi Name):</label>
+                            <input type="text" class="form-control" name="ssid" value="{{ config.network.ssid }}" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Hotspot WiFi Password:</label>
+                            <input type="text" class="form-control" name="password" value="{{ config.network.password }}" placeholder="Leave blank for open network">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Gateway IP Address:</label>
+                            <input type="text" class="form-control font-monospace" name="ap_ip" value="{{ config.network.ip }}" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Subnet Mask:</label>
+                            <input type="text" class="form-control font-monospace" name="network_mask" value="{{ config.network.network_mask }}" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">DHCP Range Start:</label>
+                            <input type="text" class="form-control font-monospace" name="dhcp_start" value="{{ config.network.dhcp_start }}" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">DHCP Range End:</label>
+                            <input type="text" class="form-control font-monospace" name="dhcp_end" value="{{ config.network.dhcp_end }}" required>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 pt-3 border-top d-flex justify-content-end">
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="bi bi-save me-1"></i> Save Network Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- TAB 2: Rates & Bandwidth -->
+            <div class="tab-pane fade" id="tab-rates" role="tabpanel">
+                <form action="{{ url_for('settings.update_rates') }}" method="POST">
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Minutes per 1 Peso (Rate):</label>
+                            <div class="input-group">
+                                <input type="number" step="0.5" min="0.5" class="form-control" name="minutes_per_peso" value="{{ config.minutes_per_peso }}" required>
+                                <span class="input-group-text">Minutes / ₱1</span>
+                            </div>
+                            <div class="form-text">Example: 5.0 gives 5 minutes for ₱1.00 (or 25 minutes for ₱5.00).</div>
+                        </div>
+                    </div>
+
+                    <h5 class="fw-bold mb-3">Bandwidth Speed Tiers (kbps)</h5>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="p-3 border rounded bg-light">
+                                <h6 class="fw-bold text-secondary mb-2"><i class="bi bi-reception-3 me-1"></i>Default Plan Bandwidth</h6>
+                                <div class="mb-2">
+                                    <label class="form-label small">Download Speed (kbps):</label>
+                                    <input type="number" class="form-control" name="default_download_kbps" value="{{ config.network.bandwidth.default_download_kbps }}" required>
+                                </div>
+                                <div>
+                                    <label class="form-label small">Upload Speed (kbps):</label>
+                                    <input type="number" class="form-control" name="default_upload_kbps" value="{{ config.network.bandwidth.default_upload_kbps }}" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="p-3 border rounded bg-light">
+                                <h6 class="fw-bold text-success mb-2"><i class="bi bi-lightning-charge-fill me-1"></i>Premium Plan Bandwidth</h6>
+                                <div class="mb-2">
+                                    <label class="form-label small">Download Speed (kbps):</label>
+                                    <input type="number" class="form-control" name="premium_download_kbps" value="{{ config.network.bandwidth.premium_download_kbps }}" required>
+                                </div>
+                                <div>
+                                    <label class="form-label small">Upload Speed (kbps):</label>
+                                    <input type="number" class="form-control" name="premium_upload_kbps" value="{{ config.network.bandwidth.premium_upload_kbps }}" required>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 pt-3 border-top d-flex justify-content-end">
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="bi bi-save me-1"></i> Save Rates & Bandwidth
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- TAB: Coin Slot Hardware -->
+            <div class="tab-pane fade" id="tab-coin" role="tabpanel">
+                <form action="{{ url_for('settings.update_coin_slot') }}" method="POST">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" name="coin_slot_enabled" id="set_coin_enabled" value="true" {% if config.coin_slot.enabled %}checked{% endif %}>
+                                <label class="form-check-label fw-bold" for="set_coin_enabled">Enable Coin Acceptor Hardware</label>
+                            </div>
+                            <div class="form-text">When disabled, customers can only be credited manually by the admin.</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Operating Mode:</label>
+                            <select class="form-select" name="coin_slot_mode">
+                                <option value="simulated" {% if config.coin_slot.mode == 'simulated' %}selected{% endif %}>Virtual / Simulated (PC & Dev)</option>
+                                <option value="gpio" {% if config.coin_slot.mode == 'gpio' %}selected{% endif %}>Physical Hardware GPIO (Raspberry Pi / Orange Pi)</option>
+                                <option value="disabled" {% if config.coin_slot.mode == 'disabled' %}selected{% endif %}>Disabled</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">SBC Board Preset:</label>
+                            <select class="form-select" name="coin_board_preset" id="set_board_preset" onchange="if(this.value=='raspberry_pi') document.getElementById('set_sig_pin').value=18; else if(this.value=='orange_pi') document.getElementById('set_sig_pin').value=7;">
+                                <option value="raspberry_pi" {% if config.coin_slot.board_preset == 'raspberry_pi' %}selected{% endif %}>Raspberry Pi 3/4/5 (Pin 12 / GPIO 18)</option>
+                                <option value="orange_pi" {% if config.coin_slot.board_preset == 'orange_pi' %}selected{% endif %}>Orange Pi One/PC (Pin 12 / GPIO 7)</option>
+                                <option value="custom" {% if config.coin_slot.board_preset == 'custom' %}selected{% endif %}>Custom Pin</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Coin Signal GPIO Pin:</label>
+                            <input type="number" class="form-control font-monospace" name="coin_signal_pin" id="set_sig_pin" value="{{ config.coin_slot.signal_pin }}" required>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Coin Relay Pin (Optional):</label>
+                            <input type="number" class="form-control font-monospace" name="coin_relay_pin" value="{{ config.coin_slot.relay_pin or '' }}" placeholder="None">
+                            <div class="form-text">Controls 12V power relay to prevent coin ingestion when inactive.</div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Pulses per ₱1:</label>
+                            <input type="number" min="1" class="form-control" name="pulses_per_peso" value="{{ config.coin_slot.pulses_per_peso }}" required>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Pulse Timeout Window (ms):</label>
+                            <input type="number" min="50" step="50" class="form-control" name="pulse_timeout_ms" value="{{ config.coin_slot.pulse_timeout_ms }}" required>
+                            <div class="form-text">Debounce idle time to calculate total coin value.</div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Insert Coin Window (seconds):</label>
+                            <input type="number" min="10" class="form-control" name="session_timeout_seconds" value="{{ config.coin_slot.session_timeout_seconds }}" required>
+                            <div class="form-text">Customer payment countdown session timeout.</div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 pt-3 border-top d-flex justify-content-end">
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="bi bi-save me-1"></i> Save Coin Slot Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- TAB 3: Admin Security -->
+            <div class="tab-pane fade" id="tab-admin" role="tabpanel">
+
+                <form action="{{ url_for('settings.update_admin') }}" method="POST">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Admin Username:</label>
+                            <input type="text" class="form-control" name="admin_username" value="{{ config.admin_username }}" required>
+                        </div>
+                        <div class="col-md-6"></div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">New Admin Password:</label>
+                            <input type="password" class="form-control" name="admin_password" placeholder="Leave blank to keep current password">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Confirm New Password:</label>
+                            <input type="password" class="form-control" name="admin_password_confirm" placeholder="Confirm new password">
+                        </div>
+                    </div>
+
+                    <div class="mt-4 pt-3 border-top d-flex justify-content-end">
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="bi bi-shield-check me-1"></i> Update Admin Credentials
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- TAB 4: System Operations -->
+            <div class="tab-pane fade" id="tab-system" role="tabpanel">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="border rounded p-3 bg-white h-100">
+                            <h6 class="fw-bold mb-2"><i class="bi bi-arrow-repeat text-warning me-1"></i>Re-Run Onboarding Wizard</h6>
+                            <p class="text-muted small mb-3">
+                                Reset the setup completion status so you or another technician can step through the initial onboarding wizard again.
+                            </p>
+                            <form action="{{ url_for('settings.reset_onboarding') }}" method="POST" onsubmit="return confirm('Reset onboarding status and re-open setup wizard?');">
+                                <button type="submit" class="btn btn-outline-warning">
+                                    <i class="bi bi-arrow-counterclockwise me-1"></i> Launch Onboarding Wizard
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="border rounded p-3 bg-white h-100">
+                            <h6 class="fw-bold mb-2"><i class="bi bi-activity text-primary me-1"></i>Hardware Diagnostics & Logs</h6>
+                            <p class="text-muted small mb-3">
+                                Test network connectivity, inspect iptables rules, check daemon health, and run live ping/DNS queries.
+                            </p>
+                            <a href="{{ url_for('diagnostics.index') }}" class="btn btn-outline-primary">
+                                <i class="bi bi-speedometer me-1"></i> Open Diagnostics Suite
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Vouchers -->
+            <div class="tab-pane fade" id="tab-vouchers" role="tabpanel">
+                <div class="row g-4">
+                    <div class="col-lg-4">
+                        <div class="card border border-light-subtle shadow-none h-100">
+                            <div class="card-header bg-light fw-bold py-2">
+                                <i class="bi bi-plus-circle text-primary me-1"></i> Generate Promotional Vouchers
+                            </div>
+                            <div class="card-body">
+                                <form action="{{ url_for('settings.generate_vouchers') }}" method="POST">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Number of Codes:</label>
+                                        <input type="number" class="form-control" name="count" min="1" max="100" value="5" required>
+                                        <div class="form-text">Generate up to 100 codes in one batch.</div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Time Credit (Minutes):</label>
+                                        <input type="number" step="1" class="form-control" name="time_minutes" min="1" value="60" required>
+                                        <div class="form-text">e.g. 60 = 1 hour, 1440 = 24 hours.</div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Expires in (Days):</label>
+                                        <input type="number" class="form-control" name="expires_days" min="1" max="365" value="30" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100">
+                                        <i class="bi bi-ticket-detailed me-1"></i> Generate Batch Codes
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-8">
+                        <div class="card border border-light-subtle shadow-none h-100">
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
+                                <span class="fw-bold"><i class="bi bi-card-checklist text-success me-1"></i> Voucher Inventory</span>
+                                <span class="badge bg-secondary">{{ vouchers|length }} Total</span>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                                    <table class="table table-hover table-striped align-middle mb-0">
+                                        <thead class="table-light text-muted small text-uppercase sticky-top">
+                                            <tr>
+                                                <th>Code</th>
+                                                <th>Minutes</th>
+                                                <th>Status</th>
+                                                <th>Expires</th>
+                                                <th class="text-end">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for v in vouchers %}
+                                            <tr>
+                                                <td><span class="badge bg-dark-subtle text-dark font-monospace fs-6">{{ v.code }}</span></td>
+                                                <td class="fw-semibold">{{ v.time_minutes|int }} mins</td>
+                                                <td>
+                                                    {% if v.is_used %}
+                                                        <span class="badge bg-secondary"><i class="bi bi-check2-circle me-1"></i>Used</span>
+                                                        <span class="small text-muted font-monospace d-block">{{ v.used_by_mac }}</span>
+                                                    {% elif v.is_expired %}
+                                                        <span class="badge bg-danger">Expired</span>
+                                                    {% else %}
+                                                        <span class="badge bg-success">Active</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td class="small text-muted">{{ v.expires_at or 'Never' }}</td>
+                                                <td class="text-end">
+                                                    <form action="{{ url_for('settings.delete_voucher') }}" method="POST" class="d-inline" onsubmit="return confirm('Revoke and delete voucher code {{ v.code }}?');">
+                                                        <input type="hidden" name="code" value="{{ v.code }}">
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                                            <i class="bi bi-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                            {% else %}
+                                            <tr>
+                                                <td colspan="5" class="text-center py-4 text-muted">
+                                                    <i class="bi bi-ticket-perforated fs-3 d-block mb-1"></i>
+                                                    No vouchers generated yet.
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Backups -->
+            <div class="tab-pane fade" id="tab-backups" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <div>
+                        <h6 class="fw-bold mb-1"><i class="bi bi-database-down text-primary me-1"></i>System Snapshot Backups</h6>
+                        <p class="text-muted small mb-0">Snapshots contain online SQLite backups and sanitized configuration archives.</p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <form action="{{ url_for('settings.create_backup') }}" method="POST">
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-plus-circle me-1"></i> Create Snapshot Now
+                            </button>
+                        </form>
+                        <form action="{{ url_for('settings.prune_backups') }}" method="POST" class="d-flex gap-1 align-items-center">
+                            <input type="number" name="max_keep" value="7" min="1" max="50" class="form-control form-control-sm" style="width: 70px;">
+                            <button type="submit" class="btn btn-outline-secondary btn-sm text-nowrap">
+                                <i class="bi bi-scissors me-1"></i> Prune
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card border border-light-subtle shadow-none">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light text-muted small text-uppercase">
+                                <tr>
+                                    <th>Archive File</th>
+                                    <th>Size</th>
+                                    <th>Created At</th>
+                                    <th>Contents</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for b in backups %}
+                                <tr>
+                                    <td>
+                                        <i class="bi bi-file-earmark-zip text-warning fs-5 me-1"></i>
+                                        <span class="font-monospace fw-semibold">{{ b.filename }}</span>
+                                    </td>
+                                    <td>{{ (b.size_bytes / 1024)|round(1) }} KB</td>
+                                    <td class="small text-muted">{{ b.created_at }}</td>
+                                    <td>
+                                        {% if b.contains_db %}<span class="badge bg-info-subtle text-info border">SQLite</span>{% endif %}
+                                        {% if b.contains_env %}<span class="badge bg-secondary-subtle text-secondary border">.env</span>{% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        <a href="{{ url_for('settings.download_backup', filename=b.filename) }}" class="btn btn-sm btn-outline-primary me-1" title="Download Zip">
+                                            <i class="bi bi-download"></i>
+                                        </a>
+                                        <form action="{{ url_for('settings.restore_backup') }}" method="POST" class="d-inline" onsubmit="return confirm('Restore database and configuration from {{ b.filename }}? Current live data will be replaced.');">
+                                            <input type="hidden" name="filename" value="{{ b.filename }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-warning me-1" title="Restore Archive">
+                                                <i class="bi bi-arrow-counterclockwise"></i>
+                                            </button>
+                                        </form>
+                                        <form action="{{ url_for('settings.delete_backup') }}" method="POST" class="d-inline" onsubmit="return confirm('Permanently delete backup {{ b.filename }}?');">
+                                            <input type="hidden" name="filename" value="{{ b.filename }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Archive">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-4 text-muted">
+                                        <i class="bi bi-archive fs-3 d-block mb-1"></i>
+                                        No backup archives available yet. Click "Create Snapshot Now" above.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Peripherals -->
+            <div class="tab-pane fade" id="tab-peripherals" role="tabpanel">
+                <div class="row g-4">
+                    <!-- Display Configuration -->
+                    <div class="col-md-6">
+                        <div class="card border border-light-subtle shadow-none h-100">
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
+                                <span class="fw-bold"><i class="bi bi-display text-primary me-1"></i> Kiosk Screen Display</span>
+                                <span class="badge {% if display_service and display_service.is_hardware %}bg-success{% elif display_service and display_service.simulated %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                                    {% if display_service and display_service.is_hardware %}Hardware Active{% elif display_service and display_service.simulated %}Simulated{% else %}Disabled{% endif %}
+                                </span>
+                            </div>
+                            <div class="card-body">
+                                <form action="{{ url_for('settings.update_display') }}" method="POST">
+                                    <div class="form-check form-switch mb-3">
+                                        <input class="form-check-input" type="checkbox" name="display_enabled" id="displayEnabledSwitch" {% if display_service and display_service.enabled %}checked{% endif %}>
+                                        <label class="form-check-label fw-bold" for="displayEnabledSwitch">Enable Kiosk Screen</label>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Display Driver / Hardware Type:</label>
+                                        <select class="form-select" name="display_type">
+                                            <option value="lcd_1602" {% if display_service and 'lcd' in display_service.display_type %}selected{% endif %}>I2C 16x2 Character LCD (HD44780 + PCF8574)</option>
+                                            <option value="ssd1306_oled" {% if display_service and 'oled' in display_service.display_type %}selected{% endif %}>0.96" I2C Monochrome OLED (SSD1306 128x64)</option>
+                                            <option value="simulated" {% if display_service and display_service.display_type == 'simulated' %}selected{% endif %}>Software Simulated (Debug / headless)</option>
+                                        </select>
+                                    </div>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-6">
+                                            <label class="form-label fw-bold">I2C Bus:</label>
+                                            <input type="number" class="form-control" name="i2c_bus" value="{{ display_service.i2c_bus if display_service else 1 }}" min="0" max="10">
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="form-label fw-bold">I2C Address (Hex):</label>
+                                            <input type="text" class="form-control font-monospace" name="i2c_address" value="{{ ('0x%02x' % display_service.i2c_address) if display_service and display_service.i2c_address else '0x27' }}">
+                                        </div>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <button type="submit" class="btn btn-primary flex-grow-1">
+                                            <i class="bi bi-save me-1"></i> Save Display Settings
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary" id="btnTestDisplay" onclick="testDisplayHardware();">
+                                            <i class="bi bi-play-circle me-1"></i> Test
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Buzzer Configuration -->
+                    <div class="col-md-6">
+                        <div class="card border border-light-subtle shadow-none h-100">
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
+                                <span class="fw-bold"><i class="bi bi-volume-up text-primary me-1"></i> GPIO Audio Buzzer</span>
+                                <span class="badge {% if buzzer_service and buzzer_service.is_hardware %}bg-success{% else %}bg-secondary{% endif %}">
+                                    {% if buzzer_service and buzzer_service.is_hardware %}Hardware Active{% else %}Simulated / Muted{% endif %}
+                                </span>
+                            </div>
+                            <div class="card-body">
+                                <form action="{{ url_for('settings.update_buzzer') }}" method="POST">
+                                    <div class="form-check form-switch mb-3">
+                                        <input class="form-check-input" type="checkbox" name="buzzer_enabled" id="buzzerEnabledSwitch" {% if buzzer_service and buzzer_service.enabled %}checked{% endif %}>
+                                        <label class="form-check-label fw-bold" for="buzzerEnabledSwitch">Enable Buzzer Chimes</label>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">GPIO Pin (BCM):</label>
+                                        <input type="number" class="form-control" name="buzzer_pin" value="{{ buzzer_service.buzzer_pin if buzzer_service else 24 }}" min="1" max="40">
+                                        <div class="form-text">BCM pin wired to buzzer transistor or driver module.</div>
+                                    </div>
+                                    <div class="form-check form-switch mb-4">
+                                        <input class="form-check-input" type="checkbox" name="buzzer_passive" id="buzzerPassiveSwitch" {% if buzzer_service and buzzer_service.passive %}checked{% endif %}>
+                                        <label class="form-check-label" for="buzzerPassiveSwitch">Passive PWM Buzzer (Variable tones / melodies)</label>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <button type="submit" class="btn btn-primary flex-grow-1">
+                                            <i class="bi bi-save me-1"></i> Save Buzzer Settings
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary" id="btnTestBuzzer" onclick="testBuzzerHardware();">
+                                            <i class="bi bi-soundwave me-1"></i> Test Chime
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    var hash = window.location.hash;
+    if (hash) {
+        var trigger = document.querySelector('button[data-bs-target="' + hash + '"]');
+        if (trigger) {
+            var tab = new bootstrap.Tab(trigger);
+            tab.show();
+        }
+    }
+});
+
+function testDisplayHardware() {
+    fetch('{{ url_for("settings.api_test_display") }}', {method: 'POST'})
+        .then(r => r.json())
+        .then(data => alert(data.success ? 'Display test sent successfully!' : ('Error: ' + data.error)))
+        .catch(e => alert('Request failed: ' + e));
+}
+
+function testBuzzerHardware() {
+    fetch('{{ url_for("settings.api_test_buzzer") }}', {method: 'POST'})
+        .then(r => r.json())
+        .then(data => alert(data.success ? 'Buzzer chime triggered!' : ('Error: ' + data.error)))
+        .catch(e => alert('Request failed: ' + e));
+}
+</script>
+{% endblock %}

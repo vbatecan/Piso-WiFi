@@ -1,0 +1,645 @@
+{% extends "base.html" %}
+
+{% block title %}Initial Setup & Onboarding Wizard{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <!-- Header -->
+        <div class="text-center mb-4">
+            <div class="d-inline-flex align-items-center justify-content-center bg-primary text-white rounded-circle p-3 mb-2 shadow-sm" style="width: 64px; height: 64px;">
+                <i class="bi bi-broadcast-pin fs-2"></i>
+            </div>
+            <h2 class="fw-bold">Piso-WiFi Setup & Onboarding</h2>
+            <p class="text-muted">
+                Configure your network interfaces, wireless hotspot, coin rates, and security credentials through the web.
+            </p>
+        </div>
+
+        <!-- Stepper Navigation Header -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body p-3">
+                <div class="d-flex justify-content-between flex-wrap text-center gap-2">
+                    <div class="step-indicator active" id="indicator-1">
+                        <span class="badge rounded-pill bg-primary px-3 py-2">1</span>
+                        <div class="small fw-semibold mt-1">Pre-Flight</div>
+                    </div>
+                    <div class="step-indicator" id="indicator-2">
+                        <span class="badge rounded-pill bg-secondary px-3 py-2">2</span>
+                        <div class="small fw-semibold mt-1">Interfaces</div>
+                    </div>
+                    <div class="step-indicator" id="indicator-3">
+                        <span class="badge rounded-pill bg-secondary px-3 py-2">3</span>
+                        <div class="small fw-semibold mt-1">WiFi & IP</div>
+                    </div>
+                    <div class="step-indicator" id="indicator-4">
+                        <span class="badge rounded-pill bg-secondary px-3 py-2">4</span>
+                        <div class="small fw-semibold mt-1">Rates & QoS</div>
+                    </div>
+                    <div class="step-indicator" id="indicator-5">
+                        <span class="badge rounded-pill bg-secondary px-3 py-2">5</span>
+                        <div class="small fw-semibold mt-1">Security</div>
+                    </div>
+                    <div class="step-indicator" id="indicator-6">
+                        <span class="badge rounded-pill bg-secondary px-3 py-2">6</span>
+                        <div class="small fw-semibold mt-1">Activate</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Wizard Form -->
+        <form id="onboardingForm" action="{{ url_for('onboarding.complete_setup') }}" method="POST">
+            <!-- STEP 1: System Pre-Flight Check -->
+            <div class="card shadow-sm border-0 wizard-step" id="step-1">
+                <div class="card-header bg-white py-3 border-0">
+                    <h5 class="mb-0 fw-bold"><i class="bi bi-shield-check text-primary me-2"></i>Step 1: System & Hardware Pre-Flight Check</h5>
+                </div>
+                <div class="card-body p-4">
+                    <p class="text-muted small">
+                        Piso-WiFi requires Linux kernel packet forwarding, wireless tools, and essential daemon packages.
+                    </p>
+
+                    <div class="row g-3 mb-4">
+                        <!-- Host Privileges -->
+                        <div class="col-md-6">
+                            <div class="p-3 border rounded h-100 bg-white d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="fw-bold">Root / Privileged User</div>
+                                    <small class="text-muted">Required for iptables, hostapd, and tc</small>
+                                </div>
+                                {% if prereqs.is_root %}
+                                    <span class="badge bg-success px-3 py-2"><i class="bi bi-check-lg"></i> Root</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark px-3 py-2"><i class="bi bi-exclamation-triangle"></i> Non-Root</span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- RFKill WiFi Status -->
+                        <div class="col-md-6">
+                            <div class="p-3 border rounded h-100 bg-white d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="fw-bold">WiFi RFKill State</div>
+                                    <small class="text-muted">{{ prereqs.rfkill.details }}</small>
+                                </div>
+                                {% if not prereqs.rfkill.blocked %}
+                                    <span class="badge bg-success px-3 py-2"><i class="bi bi-check-lg"></i> Unblocked</span>
+                                {% else %}
+                                    <span class="badge bg-danger px-3 py-2"><i class="bi bi-x-lg"></i> Blocked</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold mb-3">Required System Binaries:</h6>
+                    <div class="table-responsive mb-4">
+                        <table class="table table-bordered table-sm align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Binary</th>
+                                    <th>Role</th>
+                                    <th>Status</th>
+                                    <th>Detected Path</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for bin_name, bin_info in prereqs.binaries.items() %}
+                                <tr>
+                                    <td class="fw-bold font-monospace">{{ bin_name }}</td>
+                                    <td>
+                                        {% if bin_name == 'hostapd' %}WiFi Access Point Daemon
+                                        {% elif bin_name == 'dnsmasq' %}DHCP & DNS Captive Server
+                                        {% elif bin_name == 'iptables' %}Kernel Firewall & NAT
+                                        {% elif bin_name == 'iw' %}Wireless Subsystem Configuration
+                                        {% elif bin_name == 'ip' %}Interface & Route Controller
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if bin_info.installed %}
+                                            <span class="badge bg-success"><i class="bi bi-check-circle"></i> Ready</span>
+                                        {% else %}
+                                            <span class="badge bg-danger"><i class="bi bi-x-circle"></i> Missing</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="font-monospace small text-muted">{{ bin_info.path or 'Not found' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {% if prereqs.issues %}
+                    <div class="alert alert-warning">
+                        <h6 class="alert-heading fw-bold"><i class="bi bi-exclamation-triangle-fill me-1"></i> Pre-flight Notices:</h6>
+                        <ul class="mb-0 small">
+                            {% for issue in prereqs.issues %}
+                            <li>{{ issue }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="card-footer bg-white d-flex justify-content-end p-3 border-0">
+                    <button type="button" class="btn btn-primary px-4" onclick="nextStep(2)">
+                        Continue to Network Interfaces <i class="bi bi-arrow-right ms-1"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- STEP 2: Network Interface Assignment -->
+            <div class="card shadow-sm border-0 wizard-step d-none" id="step-2">
+                <div class="card-header bg-white py-3 border-0">
+                    <h5 class="mb-0 fw-bold"><i class="bi bi-diagram-3 text-primary me-2"></i>Step 2: Network Interface Selection</h5>
+                </div>
+                <div class="card-body p-4">
+                    <p class="text-muted small">
+                        Select the physical adapter dedicated to broadcasting the customer WiFi hotspot (AP Egress) and the adapter providing internet access (WAN Ingress).
+                    </p>
+
+                    <!-- AP Wireless Interface Selection -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">1. Hotspot Wireless Interface (AP Interface):</label>
+                        <div class="row g-3">
+                            {% set ns = namespace(found_wireless=false) %}
+                            {% for iface in interfaces %}
+                                {% if iface.is_wireless %}
+                                {% set ns.found_wireless = true %}
+                                <div class="col-md-6">
+                                    <div class="border rounded p-3 h-100 bg-white interface-card" onclick="selectApIface('{{ iface.name }}')">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="wifi_interface" id="ap_{{ iface.name }}" value="{{ iface.name }}" {% if loop.first or iface.name == config.network.ap_interface %}checked{% endif %}>
+                                            <label class="form-check-label fw-bold font-monospace" for="ap_{{ iface.name }}">
+                                                {{ iface.name }}
+                                            </label>
+                                            <div class="d-flex flex-wrap gap-1 mt-1">
+                                                <span class="badge bg-info text-dark">WiFi Wireless</span>
+                                                {% if iface.supports_ap %}
+                                                    <span class="badge bg-success">AP Mode Capable</span>
+                                                {% else %}
+                                                    <span class="badge bg-warning text-dark">Client Only</span>
+                                                {% endif %}
+                                                {% if iface.carrier %}
+                                                    <span class="badge bg-secondary">Link Active</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="small text-muted mt-2">
+                                                MAC: <span class="font-monospace">{{ iface.mac_address }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                            {% if not ns.found_wireless %}
+                            <div class="col-12">
+                                <div class="alert alert-warning mb-2">
+                                    No wireless interfaces were automatically discovered. You may manually specify an interface name below (e.g. <code>wlan0</code>).
+                                </div>
+                                <input type="text" class="form-control font-monospace" name="wifi_interface" value="{{ config.network.ap_interface or 'wlan0' }}" required>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- WAN Uplink Interface Selection -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">2. Internet Uplink Interface (WAN Ingress):</label>
+                        <select class="form-select font-monospace" name="internet_interface" id="internet_interface_select">
+                            <option value="auto" {% if config.network.internet_interface == 'auto' or not config.network.internet_interface %}selected{% endif %}>
+                                auto (Recommended: Automatically detect active internet gateway)
+                            </option>
+                            {% for iface in interfaces %}
+                                <option value="{{ iface.name }}" {% if config.network.internet_interface == iface.name %}selected{% endif %}>
+                                    {{ iface.name }} ({% if iface.is_wireless %}Wireless{% else %}Wired Ethernet{% endif %} &bull; {% if iface.is_default_uplink %}Current Default Gateway{% elif iface.carrier %}Carrier UP{% else %}Down{% endif %})
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">
+                            Select <code>auto</code> to let Piso-WiFi dynamically detect the uplink route (Ethernet <code>eth0</code>/<code>eno1</code>, USB modem, or secondary WiFi).
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-white d-flex justify-content-between p-3 border-0">
+                    <button type="button" class="btn btn-outline-secondary px-4" onclick="nextStep(1)">
+                        <i class="bi bi-arrow-left me-1"></i> Back
+                    </button>
+                    <button type="button" class="btn btn-primary px-4" onclick="nextStep(3)">
+                        Next: Hotspot & Network <i class="bi bi-arrow-right ms-1"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- STEP 3: Hotspot & Network Settings -->
+            <div class="card shadow-sm border-0 wizard-step d-none" id="step-3">
+                <div class="card-header bg-white py-3 border-0">
+                    <h5 class="mb-0 fw-bold"><i class="bi bi-wifi text-primary me-2"></i>Step 3: WiFi Hotspot & Captive Network</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-3">
+                        <!-- SSID -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">WiFi Hotspot Name (SSID):</label>
+                            <input type="text" class="form-control" name="ssid" id="ssid" value="{{ config.network.ssid or 'PisoWiFi' }}" required placeholder="e.g. PisoWiFi">
+                            <div class="form-text">The broadcast name visible on customer phones and laptops.</div>
+                        </div>
+
+                        <!-- Hotspot Password -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">WiFi Password (Optional / Open):</label>
+                            <input type="text" class="form-control" name="password" id="password" value="{{ config.network.password or 'pisowifi123' }}" placeholder="Leave blank for open captive network">
+                            <div class="form-text">Most Piso-WiFi setups use an open network or WPA2 password.</div>
+                        </div>
+
+                        <!-- AP IP Address -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Hotspot Gateway IP:</label>
+                            <input type="text" class="form-control font-monospace" name="ap_ip" id="ap_ip" value="{{ config.network.ip or '192.168.4.1' }}" required>
+                            <div class="form-text">Local IP address assigned to the Piso-WiFi box (default: 192.168.4.1).</div>
+                        </div>
+
+                        <!-- Network Mask -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Subnet Mask:</label>
+                            <input type="text" class="form-control font-monospace" name="network_mask" id="network_mask" value="{{ config.network.network_mask or '255.255.255.0' }}" required>
+                            <div class="form-text">Subnet mask for the customer network (default: 255.255.255.0).</div>
+                        </div>
+
+                        <!-- DHCP Range -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">DHCP Range Start:</label>
+                            <input type="text" class="form-control font-monospace" name="dhcp_start" id="dhcp_start" value="{{ config.network.dhcp_start or '192.168.4.2' }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">DHCP Range End:</label>
+                            <input type="text" class="form-control font-monospace" name="dhcp_end" id="dhcp_end" value="{{ config.network.dhcp_end or '192.168.4.50' }}" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-white d-flex justify-content-between p-3 border-0">
+                    <button type="button" class="btn btn-outline-secondary px-4" onclick="nextStep(2)">
+                        <i class="bi bi-arrow-left me-1"></i> Back
+                    </button>
+                    <button type="button" class="btn btn-primary px-4" onclick="nextStep(4)">
+                        Next: Rates & Bandwidth <i class="bi bi-arrow-right ms-1"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- STEP 4: Pricing & Bandwidth Presets -->
+            <div class="card shadow-sm border-0 wizard-step d-none" id="step-4">
+                <div class="card-header bg-white py-3 border-0">
+                    <h5 class="mb-0 fw-bold"><i class="bi bi-cash-coin text-primary me-2"></i>Step 4: Coin Slot Hardware, Rates & QoS</h5>
+                </div>
+                <div class="card-body p-4">
+                    <!-- Coin Slot Hardware Box -->
+                    <div class="p-3 border rounded bg-white mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <h6 class="fw-bold mb-0"><i class="bi bi-cpu text-primary me-2"></i>Allan 1239 Coin Acceptor Hardware</h6>
+                                <small class="text-muted">Configure the physical GPIO or simulated pulse listener for accepting coins.</small>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="coin_slot_enabled" id="coin_slot_enabled" value="true" checked>
+                                <label class="form-check-label fw-bold" for="coin_slot_enabled">Enable Coin Slot</label>
+                            </div>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Operating Mode:</label>
+                                <select class="form-select form-select-sm" name="coin_slot_mode" id="coin_slot_mode">
+                                    <option value="simulated">Virtual / Simulated Mode (PC & Dev)</option>
+                                    <option value="gpio">Physical Hardware GPIO (SBC)</option>
+                                    <option value="disabled">Disabled / Manual Top-up Only</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">SBC Hardware Board Preset:</label>
+                                <select class="form-select form-select-sm" name="coin_board_preset" id="coin_board_preset" onchange="onCoinPresetChange(this.value)">
+                                    <option value="raspberry_pi">Raspberry Pi 3/4/5 (Pin 12 / GPIO 18)</option>
+                                    <option value="orange_pi">Orange Pi One/PC/Zero (Pin 12 / GPIO 7)</option>
+                                    <option value="custom">Custom GPIO Pin</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-2">
+                                <label class="form-label small fw-bold">Signal GPIO Pin:</label>
+                                <input type="number" class="form-control form-control-sm font-monospace" name="coin_signal_pin" id="coin_signal_pin" value="18" required>
+                            </div>
+
+                            <div class="col-md-2">
+                                <label class="form-label small fw-bold">Relay Pin (Optional):</label>
+                                <input type="number" class="form-control form-control-sm font-monospace" name="coin_relay_pin" id="coin_relay_pin" value="" placeholder="e.g. 23">
+                            </div>
+
+                            <div class="col-12">
+                                <div class="alert alert-light border small text-muted mb-0 py-2">
+                                    <i class="bi bi-info-circle text-info me-1"></i>
+                                    <strong>Wiring Note:</strong> Always connect the coin slot white wire through a 3.3V level shifter (e.g. 10kΩ/4.7kΩ voltage divider or PC817 optocoupler) before connecting to the SBC GPIO pin.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Coin Conversion Rate (Minutes per 1 Peso):</label>
+                            <div class="input-group">
+                                <input type="number" step="0.5" min="0.5" class="form-control" name="minutes_per_peso" id="minutes_per_peso" value="{{ config.minutes_per_peso or 5.0 }}" required>
+                                <span class="input-group-text">Minutes / ₱1</span>
+                            </div>
+                            <div class="form-text">Example: 5.0 gives 5 minutes for 1 Peso (or 25 minutes for ₱5).</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Pulses per ₱1 (Ratio):</label>
+                            <input type="number" min="1" class="form-control" name="pulses_per_peso" id="pulses_per_peso" value="1" required>
+                            <div class="form-text">Standard: 1 pulse = ₱1 (Allan 1239 sends 5 pulses for ₱5, 10 for ₱10).</div>
+                        </div>
+                    </div>
+
+
+                    <h6 class="fw-bold mb-3">Bandwidth Rate Limiting (QoS Traffic Shaping in kbps):</h6>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="p-3 border rounded bg-white">
+                                <h6 class="fw-bold text-secondary mb-2"><i class="bi bi-reception-3 me-1"></i>Default Plan Speed</h6>
+                                <div class="mb-2">
+                                    <label class="form-label small">Download Limit (kbps):</label>
+                                    <input type="number" class="form-control form-control-sm" name="default_download_kbps" value="{{ config.network.bandwidth.default_download_kbps or 2048 }}">
+                                </div>
+                                <div>
+                                    <label class="form-label small">Upload Limit (kbps):</label>
+                                    <input type="number" class="form-control form-control-sm" name="default_upload_kbps" value="{{ config.network.bandwidth.default_upload_kbps or 1024 }}">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="p-3 border rounded bg-white">
+                                <h6 class="fw-bold text-success mb-2"><i class="bi bi-lightning-charge-fill me-1"></i>Premium Plan Speed</h6>
+                                <div class="mb-2">
+                                    <label class="form-label small">Download Limit (kbps):</label>
+                                    <input type="number" class="form-control form-control-sm" name="premium_download_kbps" value="{{ config.network.bandwidth.premium_download_kbps or 8096 }}">
+                                </div>
+                                <div>
+                                    <label class="form-label small">Upload Limit (kbps):</label>
+                                    <input type="number" class="form-control form-control-sm" name="premium_upload_kbps" value="{{ config.network.bandwidth.premium_upload_kbps or 8096 }}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-white d-flex justify-content-between p-3 border-0">
+                    <button type="button" class="btn btn-outline-secondary px-4" onclick="nextStep(3)">
+                        <i class="bi bi-arrow-left me-1"></i> Back
+                    </button>
+                    <button type="button" class="btn btn-primary px-4" onclick="nextStep(5)">
+                        Next: Admin Security <i class="bi bi-arrow-right ms-1"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- STEP 5: Administrator Account Security -->
+            <div class="card shadow-sm border-0 wizard-step d-none" id="step-5">
+                <div class="card-header bg-white py-3 border-0">
+                    <h5 class="mb-0 fw-bold"><i class="bi bi-person-lock text-primary me-2"></i>Step 5: Admin Security & Credentials</h5>
+                </div>
+                <div class="card-body p-4">
+                    <p class="text-muted small">
+                        Create your administrator account for accessing the dashboard, adjusting rates, adding time, and managing configurations.
+                    </p>
+
+                    <div class="row g-3">
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold">Admin Username:</label>
+                            <input type="text" class="form-control" name="admin_username" id="admin_username" value="{{ config.admin_username or 'admin' }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Admin Password:</label>
+                            <input type="password" class="form-control" name="admin_password" id="admin_password" value="{{ config.admin_password or 'admin123' }}" required minlength="4">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Confirm Admin Password:</label>
+                            <input type="password" class="form-control" name="admin_password_confirm" id="admin_password_confirm" value="{{ config.admin_password or 'admin123' }}" required minlength="4">
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-white d-flex justify-content-between p-3 border-0">
+                    <button type="button" class="btn btn-outline-secondary px-4" onclick="nextStep(4)">
+                        <i class="bi bi-arrow-left me-1"></i> Back
+                    </button>
+                    <button type="button" class="btn btn-primary px-4" onclick="nextStep(6)">
+                        Review & Diagnostics <i class="bi bi-arrow-right ms-1"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- STEP 6: Review, Live Diagnostics & Launch -->
+            <div class="card shadow-sm border-0 wizard-step d-none" id="step-6">
+                <div class="card-header bg-white py-3 border-0">
+                    <h5 class="mb-0 fw-bold"><i class="bi bi-check2-circle text-success me-2"></i>Step 6: Review, Diagnostics & Activation</h5>
+                </div>
+                <div class="card-body p-4">
+                    <!-- Summary Card -->
+                    <div class="p-3 border rounded bg-light mb-4">
+                        <h6 class="fw-bold mb-3"><i class="bi bi-list-check me-1"></i>Configuration Summary</h6>
+                        <div class="row g-2 small">
+                            <div class="col-6 col-md-4">
+                                <span class="text-muted d-block">Hotspot SSID:</span>
+                                <span class="fw-bold" id="summary-ssid">PisoWiFi</span>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <span class="text-muted d-block">AP Interface:</span>
+                                <span class="fw-bold font-monospace" id="summary-ap">wlan0</span>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <span class="text-muted d-block">WAN Interface:</span>
+                                <span class="fw-bold font-monospace" id="summary-wan">auto</span>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <span class="text-muted d-block">Hotspot IP:</span>
+                                <span class="fw-bold font-monospace" id="summary-ip">192.168.4.1</span>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <span class="text-muted d-block">Rate:</span>
+                                <span class="fw-bold" id="summary-rate">5.0 min / ₱1</span>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <span class="text-muted d-block">Admin Username:</span>
+                                <span class="fw-bold" id="summary-admin">admin</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Live Diagnostics Card -->
+                    <div class="border rounded p-3 bg-white mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="fw-bold mb-0"><i class="bi bi-activity text-primary me-1"></i>Live Network Connectivity Diagnostics</h6>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="btnRunTest" onclick="runLiveDiagnostics()">
+                                <i class="bi bi-play-fill me-1"></i> Run Connectivity Test
+                            </button>
+                        </div>
+                        <p class="text-muted small mb-2">Tests whether your internet uplink is active and resolving DNS queries before finalizing setup.</p>
+                        
+                        <div id="diagLoading" class="text-muted small py-2 d-none">
+                            <span class="spinner-border spinner-border-sm me-2 text-primary" role="status"></span>
+                            Testing connectivity against 8.8.8.8 and DNS resolution...
+                        </div>
+
+                        <div id="diagResults" class="d-none">
+                            <div class="row g-2 mt-1">
+                                <div class="col-md-6">
+                                    <div class="p-2 border rounded small" id="pingResultBox">
+                                        <div class="fw-bold">Ping Test (8.8.8.8):</div>
+                                        <span id="pingStatus" class="badge bg-secondary">Not tested</span>
+                                        <div id="pingDetails" class="text-muted font-monospace mt-1" style="font-size: 0.75rem;"></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="p-2 border rounded small" id="dnsResultBox">
+                                        <div class="fw-bold">DNS Query (google.com):</div>
+                                        <span id="dnsStatus" class="badge bg-secondary">Not tested</span>
+                                        <div id="dnsDetails" class="text-muted font-monospace mt-1" style="font-size: 0.75rem;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-white d-flex justify-content-between p-3 border-0">
+                    <button type="button" class="btn btn-outline-secondary px-4" onclick="nextStep(5)">
+                        <i class="bi bi-arrow-left me-1"></i> Back
+                    </button>
+                    <button type="submit" class="btn btn-success px-5 fw-bold shadow-sm">
+                        <i class="bi bi-check-circle-fill me-2"></i> Complete Setup & Launch
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function selectApIface(name) {
+        const radio = document.getElementById('ap_' + name);
+        if (radio) radio.checked = true;
+    }
+
+    function onCoinPresetChange(preset) {
+        const pinInput = document.getElementById('coin_signal_pin');
+        if (!pinInput) return;
+        if (preset === 'raspberry_pi') {
+            pinInput.value = 18;
+        } else if (preset === 'orange_pi') {
+            pinInput.value = 7;
+        }
+    }
+
+
+    function nextStep(stepNum) {
+        // Validate password match if moving from step 5 to 6
+        if (stepNum === 6) {
+            const pass = document.getElementById('admin_password').value;
+            const confirm = document.getElementById('admin_password_confirm').value;
+            if (pass !== confirm) {
+                alert('Admin passwords do not match. Please re-enter.');
+                return;
+            }
+
+            // Update summary values
+            document.getElementById('summary-ssid').textContent = document.getElementById('ssid').value || 'PisoWiFi';
+            
+            const apSelected = document.querySelector('input[name="wifi_interface"]:checked');
+            document.getElementById('summary-ap').textContent = apSelected ? apSelected.value : (document.querySelector('input[name="wifi_interface"]').value || 'wlan0');
+            
+            document.getElementById('summary-wan').textContent = document.getElementById('internet_interface_select').value;
+            document.getElementById('summary-ip').textContent = document.getElementById('ap_ip').value;
+            document.getElementById('summary-rate').textContent = (document.getElementById('minutes_per_peso').value || '5.0') + ' min / ₱1';
+            document.getElementById('summary-admin').textContent = document.getElementById('admin_username').value;
+        }
+
+        // Hide all steps
+        for (let i = 1; i <= 6; i++) {
+            const stepEl = document.getElementById('step-' + i);
+            const indEl = document.getElementById('indicator-' + i);
+            if (stepEl) {
+                if (i === stepNum) {
+                    stepEl.classList.remove('d-none');
+                } else {
+                    stepEl.classList.add('d-none');
+                }
+            }
+            if (indEl) {
+                const badge = indEl.querySelector('.badge');
+                if (i === stepNum) {
+                    badge.className = 'badge rounded-pill bg-primary px-3 py-2';
+                } else if (i < stepNum) {
+                    badge.className = 'badge rounded-pill bg-success px-3 py-2';
+                } else {
+                    badge.className = 'badge rounded-pill bg-secondary px-3 py-2';
+                }
+            }
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function runLiveDiagnostics() {
+        const btn = document.getElementById('btnRunTest');
+        const loading = document.getElementById('diagLoading');
+        const results = document.getElementById('diagResults');
+
+        btn.disabled = true;
+        loading.classList.remove('d-none');
+        results.classList.add('d-none');
+
+        try {
+            // 1. Run Ping Test
+            const pingRes = await fetch('/api/onboarding/diagnostics/ping', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ target: '8.8.8.8', count: 2 })
+            }).then(r => r.json());
+
+            const pingStatus = document.getElementById('pingStatus');
+            const pingDetails = document.getElementById('pingDetails');
+            if (pingRes.success) {
+                pingStatus.className = 'badge bg-success';
+                pingStatus.textContent = 'Online (' + (pingRes.avg_latency_ms ? pingRes.avg_latency_ms + 'ms' : '0% loss') + ')';
+                pingDetails.textContent = 'Packet loss: ' + pingRes.packet_loss_pct + '%';
+            } else {
+                pingStatus.className = 'badge bg-warning text-dark';
+                pingStatus.textContent = 'Offline / No Route';
+                pingDetails.textContent = pingRes.error || 'Failed to ping 8.8.8.8';
+            }
+
+            // 2. Run DNS Test
+            const dnsRes = await fetch('/api/onboarding/diagnostics/dns', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ domain: 'google.com' })
+            }).then(r => r.json());
+
+            const dnsStatus = document.getElementById('dnsStatus');
+            const dnsDetails = document.getElementById('dnsDetails');
+            if (dnsRes.success) {
+                dnsStatus.className = 'badge bg-success';
+                dnsStatus.textContent = 'Resolved (' + dnsRes.duration_ms + 'ms)';
+                dnsDetails.textContent = 'IP: ' + (dnsRes.resolved_ips ? dnsRes.resolved_ips.slice(0, 2).join(', ') : 'OK');
+            } else {
+                dnsStatus.className = 'badge bg-danger';
+                dnsStatus.textContent = 'Resolution Failed';
+                dnsDetails.textContent = dnsRes.error || 'Check uplink connection';
+            }
+
+            results.classList.remove('d-none');
+        } catch (err) {
+            console.error(err);
+        } finally {
+            loading.classList.add('d-none');
+            btn.disabled = false;
+        }
+    }
+</script>
+{% endblock %}

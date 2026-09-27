@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}Sales Analytics & Revenue Reports{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="fw-bold mb-1"><i class="bi bi-graph-up-arrow text-primary me-2"></i>Sales & Revenue Analytics</h2>
+        <p class="text-muted mb-0">Financial tracking, coin denomination metrics, hourly peak usage, and transaction ledgers.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/api/reports/export-csv" class="btn btn-outline-success">
+            <i class="bi bi-file-earmark-spreadsheet me-1"></i> Export CSV
+        </a>
+        <a href="{{ url_for('settings.index') }}" class="btn btn-outline-primary">
+            <i class="bi bi-sliders me-1"></i> Settings
+        </a>
+    </div>
+</div>
+
+<!-- 1. Revenue Overview KPI Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="card shadow-sm border-0 bg-primary text-white h-100">
+            <div class="card-body p-3 p-md-4">
+                <small class="text-white-50 text-uppercase fw-semibold d-block">Today (Last 24h)</small>
+                <h3 class="fw-bold my-1">₱{{ "%.2f"|format(today.total_revenue) }}</h3>
+                <small class="text-white-50">{{ today.total_transactions }} transactions</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card shadow-sm border-0 bg-info text-dark h-100">
+            <div class="card-body p-3 p-md-4">
+                <small class="text-dark-50 text-uppercase fw-semibold d-block">This Week (Last 7d)</small>
+                <h3 class="fw-bold my-1">₱{{ "%.2f"|format(week.total_revenue) }}</h3>
+                <small class="text-muted">{{ week.total_transactions }} transactions</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card shadow-sm border-0 bg-success text-white h-100">
+            <div class="card-body p-3 p-md-4">
+                <small class="text-white-50 text-uppercase fw-semibold d-block">This Month (30d)</small>
+                <h3 class="fw-bold my-1">₱{{ "%.2f"|format(month.total_revenue) }}</h3>
+                <small class="text-white-50">{{ month.total_transactions }} transactions</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card shadow-sm border-0 bg-dark text-white h-100">
+            <div class="card-body p-3 p-md-4">
+                <small class="text-white-50 text-uppercase fw-semibold d-block">All-Time Revenue</small>
+                <h3 class="fw-bold my-1">₱{{ "%.2f"|format(all_time.total_revenue) }}</h3>
+                <small class="text-white-50">{{ all_time.unique_users }} unique devices</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 2. Denomination Breakdown -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-7">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white border-0 py-3">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-pie-chart text-primary me-2"></i>Coin Breakdown by Denomination</h5>
+            </div>
+            <div class="card-body p-4 pt-0">
+                <div class="row g-3 text-center">
+                    <div class="col-6 col-sm-3">
+                        <div class="p-3 bg-light rounded-3 border">
+                            <h6 class="fw-bold text-primary mb-1">₱1 Coins</h6>
+                            <h4 class="fw-bold mb-0">{{ denominations.p1.count }}</h4>
+                            <small class="text-muted">₱{{ "%.2f"|format(denominations.p1.total_pesos) }}</small>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-3">
+                        <div class="p-3 bg-light rounded-3 border">
+                            <h6 class="fw-bold text-success mb-1">₱5 Coins</h6>
+                            <h4 class="fw-bold mb-0">{{ denominations.p5.count }}</h4>
+                            <small class="text-muted">₱{{ "%.2f"|format(denominations.p5.total_pesos) }}</small>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-3">
+                        <div class="p-3 bg-light rounded-3 border">
+                            <h6 class="fw-bold text-warning mb-1">₱10 Coins</h6>
+                            <h4 class="fw-bold mb-0">{{ denominations.p10.count }}</h4>
+                            <small class="text-muted">₱{{ "%.2f"|format(denominations.p10.total_pesos) }}</small>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-3">
+                        <div class="p-3 bg-light rounded-3 border">
+                            <h6 class="fw-bold text-danger mb-1">₱20 Coins</h6>
+                            <h4 class="fw-bold mb-0">{{ denominations.p20.count }}</h4>
+                            <small class="text-muted">₱{{ "%.2f"|format(denominations.p20.total_pesos) }}</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Webhook Alert Configuration -->
+                <div class="mt-4 pt-3 border-top">
+                    <h6 class="fw-bold mb-2"><i class="bi bi-bell me-1"></i> Operator Notifications (Telegram / Discord)</h6>
+                    <div class="input-group">
+                        <input type="text" id="webhookInput" class="form-control font-monospace small" placeholder="Discord or Telegram Webhook URL">
+                        <button type="button" class="btn btn-outline-primary" onclick="testWebhook()">Test Webhook</button>
+                    </div>
+                    <div id="webhookResult" class="small mt-2"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hourly Peak Usage Chart (Responsive CSS bar chart) -->
+    <div class="col-lg-5">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white border-0 py-3">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-clock-history text-primary me-2"></i>Peak Hours Activity (24h)</h5>
+            </div>
+            <div class="card-body p-4 pt-0">
+                <p class="text-muted small mb-3">Gross revenue distribution by hour of the day.</p>
+                <div class="d-flex align-items-end justify-content-between bg-light p-3 rounded" style="height: 180px;">
+                    {% set max_val = 1 %}
+                    {% for h, val in hourly.items() %}
+                        {% if val > max_val %}{% set max_val = val %}{% endif %}
+                    {% endfor %}
+                    {% for h in range(24) %}
+                        {% set h_val = hourly.get(h, 0.0) %}
+                        {% set pct = (h_val / max_val * 100) if max_val > 0 else 0 %}
+                        <div class="d-flex flex-column align-items-center" style="width: 3.5%;" title="{{ '%02d:00'|format(h) }}: ₱{{ h_val }}">
+                            <div class="w-100 bg-primary rounded-top" style="height: {{ [pct|int, 5]|max }}px;"></div>
+                            <span style="font-size: 0.55rem;" class="text-muted mt-1">{{ h if h % 3 == 0 else '' }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+                <div class="d-flex justify-content-between text-muted small mt-2">
+                    <span>12 AM</span>
+                    <span>6 AM</span>
+                    <span>12 PM</span>
+                    <span>6 PM</span>
+                    <span>11 PM</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 3. Recent Transactions Table -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h5 class="mb-0 fw-bold"><i class="bi bi-receipt text-primary me-2"></i>Recent Transactions</h5>
+        <span class="badge bg-secondary">Latest 25 entries</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">ID</th>
+                        <th>Device MAC</th>
+                        <th>Amount</th>
+                        <th>Minutes</th>
+                        <th>Timestamp</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tx in transactions %}
+                    <tr>
+                        <td class="ps-4 font-monospace">#{{ tx.id }}</td>
+                        <td class="font-monospace fw-bold">{{ tx.mac_address }}</td>
+                        <td><span class="badge bg-success">₱{{ "%.2f"|format(tx.amount) }}</span></td>
+                        <td>+{{ tx.minutes }} mins</td>
+                        <td class="text-muted small">{{ tx.created_at }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">No transactions recorded yet.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    async function testWebhook() {
+        const url = document.getElementById('webhookInput').value.trim();
+        const resEl = document.getElementById('webhookResult');
+        if (!url) {
+            resEl.className = 'small mt-2 text-danger';
+            resEl.innerText = 'Please enter a webhook URL.';
+            return;
+        }
+
+        resEl.className = 'small mt-2 text-muted';
+        resEl.innerText = 'Sending test notification...';
+
+        try {
+            const res = await fetch('/api/reports/test-webhook', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ webhook_url: url })
+            }).then(r => r.json());
+
+            if (res.success) {
+                resEl.className = 'small mt-2 text-success fw-bold';
+                resEl.innerText = '✓ Test alert sent successfully!';
+            } else {
+                resEl.className = 'small mt-2 text-danger';
+                resEl.innerText = '✗ Webhook error: ' + (res.error || 'Failed');
+            }
+        } catch (e) {
+            resEl.className = 'small mt-2 text-danger';
+            resEl.innerText = 'Request error: ' + e;
+        }
+    }
+</script>
+{% endblock %}

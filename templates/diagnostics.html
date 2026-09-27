@@ -1,0 +1,549 @@
+{% extends "base.html" %}
+
+{% block title %}System & Hardware Diagnostics{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="fw-bold mb-1"><i class="bi bi-activity text-primary me-2"></i>Diagnostics & Troubleshooting</h2>
+        <p class="text-muted mb-0">Live hardware diagnostics, interface link states, daemon health, and interactive network testing tools.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('debug.debug_connections') }}" target="_blank" class="btn btn-outline-secondary">
+            <i class="bi bi-file-earmark-code me-1"></i> Raw JSON State
+        </a>
+        <a href="{{ url_for('settings.index') }}" class="btn btn-outline-primary">
+            <i class="bi bi-sliders me-1"></i> Configurations
+        </a>
+    </div>
+</div>
+
+<!-- 1. WAN Uplink Diagnostics Card -->
+{% if uplink_info %}
+<div class="card shadow-sm border-0 mb-4 bg-light">
+    <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="d-flex align-items-center">
+                <i class="bi bi-globe2 fs-3 text-primary me-2"></i>
+                <h5 class="mb-0 fw-bold">Internet Uplink (WAN) Health</h5>
+            </div>
+            {% set u_status = (uplink_info.status or uplink_info.carrier_status or 'Active')|string %}
+            {% if u_status|lower in ['online', 'connected', 'active', 'up'] %}
+                <span class="badge bg-success px-3 py-2"><i class="bi bi-check-circle-fill me-1"></i> {{ u_status|capitalize }}</span>
+            {% else %}
+                <span class="badge bg-danger px-3 py-2"><i class="bi bi-exclamation-triangle-fill me-1"></i> {{ u_status|capitalize }}</span>
+            {% endif %}
+        </div>
+        <div class="row g-3">
+            <div class="col-6 col-md-3">
+                <div class="p-3 bg-white border rounded h-100">
+                    <small class="text-muted text-uppercase fw-semibold d-block" style="font-size: 0.75rem;">Interface</small>
+                    <span class="fw-bold font-monospace fs-6">{{ uplink_info.interface or 'eth0' }}</span>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="p-3 bg-white border rounded h-100">
+                    <small class="text-muted text-uppercase fw-semibold d-block" style="font-size: 0.75rem;">Connection Type</small>
+                    <span class="fw-bold fs-6">{{ uplink_info.connection_type or ('Wireless' if uplink_info.is_wireless else 'Wired LAN') }}</span>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="p-3 bg-white border rounded h-100">
+                    <small class="text-muted text-uppercase fw-semibold d-block" style="font-size: 0.75rem;">IP Address</small>
+                    <span class="fw-bold font-monospace fs-6">{{ uplink_info.ip_address or uplink_info.ip or 'None assigned' }}</span>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="p-3 bg-white border rounded h-100">
+                    <small class="text-muted text-uppercase fw-semibold d-block" style="font-size: 0.75rem;">Default Gateway</small>
+                    <span class="fw-bold font-monospace fs-6">{{ uplink_info.gateway or 'None' }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- 2. System Metrics & Daemons Status Row -->
+<div class="row g-4 mb-4">
+    <!-- System Metrics -->
+    <div class="col-lg-6">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white border-0 py-3">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-cpu text-primary me-2"></i>System Resources & Hardware</h5>
+            </div>
+            <div class="card-body p-4 pt-0">
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <small class="text-muted d-block">Hostname:</small>
+                        <span class="fw-bold font-monospace">{{ metrics.hostname }}</span>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted d-block">Uptime:</small>
+                        <span class="fw-bold">{{ metrics.uptime }}</span>
+                    </div>
+                    <div class="col-12">
+                        <small class="text-muted d-block">Load Average (1, 5, 15 min):</small>
+                        <span class="fw-bold font-monospace">{{ metrics.load_average|join(', ') }}</span>
+                    </div>
+                </div>
+
+                <!-- Memory Usage -->
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span class="fw-semibold">RAM Usage</span>
+                        <span>{{ metrics.memory.used_mb }} MB / {{ metrics.memory.total_mb }} MB ({{ metrics.memory.used_pct }}%)</span>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar bg-info" role="progressbar" style="width: {{ metrics.memory.used_pct }}%"></div>
+                    </div>
+                </div>
+
+                <!-- Disk Usage -->
+                <div>
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span class="fw-semibold">Storage Space (/)</span>
+                        <span>{{ metrics.disk.used_pct }}% used ({{ metrics.disk.free_gb }} GB free)</span>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar {% if metrics.disk.used_pct > 85 %}bg-danger{% else %}bg-success{% endif %}" role="progressbar" style="width: {{ metrics.disk.used_pct }}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Core Daemons Status -->
+    <div class="col-lg-6">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white border-0 py-3">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-hdd-rack text-primary me-2"></i>Core Services Health</h5>
+            </div>
+            <div class="card-body p-4 pt-0">
+                <div class="list-group list-group-flush">
+                    <!-- Hostapd -->
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <div>
+                            <div class="fw-bold">hostapd (WiFi AP Daemon)</div>
+                            <small class="text-muted">Broadcasts SSID and manages 802.11 beacons</small>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            {% if services.hostapd.active %}
+                                <span class="badge bg-success">Active</span>
+                            {% else %}
+                                <span class="badge bg-danger">Inactive</span>
+                            {% endif %}
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="restartDaemon('hostapd')">Restart</button>
+                        </div>
+                    </div>
+
+                    <!-- Dnsmasq -->
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <div>
+                            <div class="fw-bold">dnsmasq (DHCP & DNS)</div>
+                            <small class="text-muted">Distributes client IP leases and resolves DNS</small>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            {% if services.dnsmasq.active %}
+                                <span class="badge bg-success">Active</span>
+                            {% else %}
+                                <span class="badge bg-danger">Inactive</span>
+                            {% endif %}
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="restartDaemon('dnsmasq')">Restart</button>
+                        </div>
+                    </div>
+
+                    <!-- iptables NAT -->
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <div>
+                            <div class="fw-bold">iptables NAT & Captive Portal</div>
+                            <small class="text-muted">Port 80 redirection and NAT forwarding</small>
+                        </div>
+                        <div>
+                            {% if services.iptables_nat %}
+                                <span class="badge bg-success">Configured</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">No Rules</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 3. Network Interfaces Table -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white border-0 py-3">
+        <h5 class="mb-0 fw-bold"><i class="bi bi-ethernet text-primary me-2"></i>Network Interfaces Overview</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">Interface</th>
+                        <th>Type</th>
+                        <th>MAC Address</th>
+                        <th>IP Address</th>
+                        <th>Carrier Link</th>
+                        <th>AP Capable</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for iface in interfaces %}
+                    <tr>
+                        <td class="ps-4">
+                            <span class="fw-bold font-monospace">{{ iface.name }}</span>
+                            {% if iface.name == config.network.ap_interface %}
+                                <span class="badge bg-primary ms-1">AP Hotspot</span>
+                            {% endif %}
+                            {% if iface.is_default_uplink %}
+                                <span class="badge bg-info text-dark ms-1">Default WAN</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if iface.is_wireless %}
+                                <span class="badge bg-secondary"><i class="bi bi-wifi"></i> Wireless</span>
+                            {% else %}
+                                <span class="badge bg-light text-dark border"><i class="bi bi-ethernet"></i> Ethernet</span>
+                            {% endif %}
+                        </td>
+                        <td class="font-monospace small">{{ iface.mac_address }}</td>
+                        <td class="font-monospace small">
+                            {{ iface.ip_addresses|join(', ') if iface.ip_addresses else 'None' }}
+                        </td>
+                        <td>
+                            {% if iface.carrier %}
+                                <span class="badge bg-success">UP</span>
+                            {% else %}
+                                <span class="badge bg-secondary">NO-CARRIER</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if iface.supports_ap %}
+                                <span class="badge bg-success"><i class="bi bi-check"></i> Supported</span>
+                            {% elif iface.is_wireless %}
+                                <span class="badge bg-warning text-dark">Client Only</span>
+                            {% else %}
+                                <span class="text-muted small">N/A</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- 4. Coin Slot Hardware & Pulse Tester -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h5 class="mb-0 fw-bold"><i class="bi bi-coin text-warning me-2"></i>Coin Slot Hardware & Pulse Tester</h5>
+        <div class="d-flex align-items-center gap-2">
+            {% if coin_status.mode == 'gpio' and coin_status.gpio_available %}
+                <span class="badge bg-success"><i class="bi bi-cpu-fill me-1"></i> Physical GPIO Active</span>
+            {% elif coin_status.mode == 'gpio' %}
+                <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle-fill me-1"></i> GPIO Configured (Emulated)</span>
+            {% else %}
+                <span class="badge bg-secondary"><i class="bi bi-laptop me-1"></i> Software Simulated</span>
+            {% endif %}
+            <span class="badge bg-info text-dark font-monospace">Signal: Pin {{ coin_status.signal_pin or 18 }}</span>
+        </div>
+    </div>
+    <div class="card-body p-4 pt-0">
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-3">
+                <div class="p-3 bg-light border rounded h-100">
+                    <small class="text-muted text-uppercase fw-semibold d-block" style="font-size: 0.75rem;">Acceptor Status</small>
+                    <span class="fw-bold fs-6">
+                        {% if coin_status.enabled %}
+                            <span class="text-success"><i class="bi bi-check-circle me-1"></i>Enabled</span>
+                        {% else %}
+                            <span class="text-muted"><i class="bi bi-slash-circle me-1"></i>Disabled</span>
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="p-3 bg-light border rounded h-100">
+                    <small class="text-muted text-uppercase fw-semibold d-block" style="font-size: 0.75rem;">Board Target</small>
+                    <span class="fw-bold fs-6 text-capitalize">{{ coin_status.board_preset or 'Raspberry Pi' }}</span>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="p-3 bg-light border rounded h-100">
+                    <small class="text-muted text-uppercase fw-semibold d-block" style="font-size: 0.75rem;">Relay Interlock</small>
+                    <span class="fw-bold fs-6" id="relayStatusBadge">
+                        {% if coin_status.relay_active %}
+                            <span class="text-primary"><i class="bi bi-lightning-charge-fill me-1"></i>Energized (12V ON)</span>
+                        {% else %}
+                            <span class="text-secondary"><i class="bi bi-pause-circle me-1"></i>De-energized (OFF)</span>
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="p-3 bg-light border rounded h-100">
+                    <small class="text-muted text-uppercase fw-semibold d-block" style="font-size: 0.75rem;">Total Pulses / Pesos</small>
+                    <span class="fw-bold font-monospace fs-6">
+                        <span id="statPulses">{{ coin_status.total_pulses or 0 }}</span> pulses / ₱<span id="statPesos">{{ coin_status.total_pesos or 0 }}</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Interactive Coin Simulation & Relay Test Form -->
+        <div class="row g-3">
+            <div class="col-lg-7">
+                <h6 class="fw-bold mb-2">Simulate Coin Pulse Insertion</h6>
+                <p class="text-muted small mb-3">Trigger pulses programmatically to verify Allan 1239 debounce logic, pulse counting, and time allocation without dropping physical coins.</p>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Target Client MAC Address (Optional):</label>
+                    <input type="text" id="simMacAddress" class="form-control font-monospace" placeholder="e.g. 02:00:00:11:22:33 (or leave blank to test pulse listener)">
+                </div>
+
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <button type="button" class="btn btn-outline-primary" onclick="simulateCoin(1)">
+                        <i class="bi bi-coin me-1"></i> Insert ₱1 (1 pulse)
+                    </button>
+                    <button type="button" class="btn btn-outline-success" onclick="simulateCoin(5)">
+                        <i class="bi bi-coin me-1"></i> Insert ₱5 (5 pulses)
+                    </button>
+                    <button type="button" class="btn btn-outline-warning text-dark" onclick="simulateCoin(10)">
+                        <i class="bi bi-coin me-1"></i> Insert ₱10 (10 pulses)
+                    </button>
+                    <button type="button" class="btn btn-outline-danger" onclick="simulateCoin(20)">
+                        <i class="bi bi-coin me-1"></i> Insert ₱20 (20 pulses)
+                    </button>
+                </div>
+
+                <div class="d-flex align-items-center gap-3 pt-2 border-top">
+                    <span class="small fw-semibold">Relay Line Control:</span>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleRelay(true)">
+                        <i class="bi bi-lightning-charge me-1"></i> Energize Relay (ON)
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleRelay(false)">
+                        <i class="bi bi-power me-1"></i> Turn OFF Relay
+                    </button>
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <h6 class="fw-bold mb-2">Pulse Activity & Test Log</h6>
+                <div id="coinConsole" class="bg-dark text-light p-3 rounded font-monospace small" style="min-height: 180px; max-height: 220px; overflow-y: auto;">
+                    <div class="text-secondary">// Coin slot event log will appear here...</div>
+                    {% if coin_status.recent_events %}
+                        {% for ev in coin_status.recent_events %}
+                            <div class="text-info">• [{{ ev.timestamp }}] {{ ev.event }} ({{ ev.pesos }} PHP, {{ ev.pulses }} pulses) -> {{ ev.mac_address or 'No MAC' }}</div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 5. Interactive Diagnostics Tools -->
+<div class="row g-4">
+    <!-- Ping Diagnostic Tool -->
+    <div class="col-lg-6">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white border-0 py-3">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-arrow-left-right text-primary me-2"></i>Interactive Ping Diagnostic Tool</h5>
+            </div>
+            <div class="card-body p-4 pt-0">
+                <p class="text-muted small">Test latency and packet loss from this Piso-WiFi host to any target IP or host.</p>
+                <div class="input-group mb-3">
+                    <input type="text" id="pingTarget" class="form-control font-monospace" placeholder="Target host or IP" value="8.8.8.8">
+                    <button class="btn btn-primary" type="button" id="btnPing" onclick="executePing()">
+                        <i class="bi bi-send me-1"></i> Send Ping
+                    </button>
+                </div>
+
+                <div id="pingConsole" class="bg-dark text-light p-3 rounded font-monospace small" style="min-height: 120px; max-height: 200px; overflow-y: auto;">
+                    <div class="text-secondary">// Output will appear here...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DNS Diagnostic Tool -->
+    <div class="col-lg-6">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white border-0 py-3">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-search text-primary me-2"></i>Interactive DNS Lookup Tool</h5>
+            </div>
+            <div class="card-body p-4 pt-0">
+                <p class="text-muted small">Verify DNS resolution against configured local and upstream resolvers.</p>
+                <div class="input-group mb-3">
+                    <input type="text" id="dnsDomain" class="form-control font-monospace" placeholder="Domain name" value="google.com">
+                    <button class="btn btn-primary" type="button" id="btnDns" onclick="executeDns()">
+                        <i class="bi bi-search me-1"></i> Resolve Domain
+                    </button>
+                </div>
+
+                <div id="dnsConsole" class="bg-dark text-light p-3 rounded font-monospace small" style="min-height: 120px; max-height: 200px; overflow-y: auto;">
+                    <div class="text-secondary">// Output will appear here...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    async function simulateCoin(denomination) {
+        const consoleEl = document.getElementById('coinConsole');
+        const mac = document.getElementById('simMacAddress') ? document.getElementById('simMacAddress').value.trim() : '';
+
+        consoleEl.innerHTML = '<span class="text-warning">Sending ₱' + denomination + ' pulse stream...</span>\n' + consoleEl.innerHTML;
+
+        try {
+            const res = await fetch('/api/diagnostics/coin/simulate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    denomination: denomination,
+                    mac_address: mac
+                })
+            }).then(r => r.json());
+
+            if (res.success) {
+                const now = new Date().toLocaleTimeString();
+                consoleEl.innerHTML = '<span class="text-success fw-bold">✓ [' + now + '] ₱' + res.denomination + ' Accepted (' + res.pulses + ' pulses, +' + res.minutes_credited + ' mins)</span>\n'
+                    + '<span class="text-light">Target: ' + (res.mac_address || 'Unassigned') + '</span>\n' + consoleEl.innerHTML;
+                refreshCoinStatus();
+            } else {
+                consoleEl.innerHTML = '<span class="text-danger fw-bold">✗ Coin Simulation Failed: ' + (res.error || 'Unknown error') + '</span>\n' + consoleEl.innerHTML;
+            }
+        } catch (err) {
+            consoleEl.innerHTML = '<span class="text-danger">Request error: ' + err + '</span>\n' + consoleEl.innerHTML;
+        }
+    }
+
+    async function toggleRelay(state) {
+        const consoleEl = document.getElementById('coinConsole');
+        try {
+            const res = await fetch('/api/diagnostics/coin/relay', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ state: state })
+            }).then(r => r.json());
+
+            if (res.success) {
+                const badge = document.getElementById('relayStatusBadge');
+                if (badge) {
+                    badge.innerHTML = res.relay_state 
+                        ? '<span class="text-primary"><i class="bi bi-lightning-charge-fill me-1"></i>Energized (12V ON)</span>'
+                        : '<span class="text-secondary"><i class="bi bi-pause-circle me-1"></i>De-energized (OFF)</span>';
+                }
+                const now = new Date().toLocaleTimeString();
+                consoleEl.innerHTML = '<span class="text-info">• [' + now + '] Relay state set to: ' + (res.relay_state ? 'ON (12V Engaged)' : 'OFF') + '</span>\n' + consoleEl.innerHTML;
+            } else {
+                consoleEl.innerHTML = '<span class="text-danger">Relay error: ' + (res.error || 'Failed') + '</span>\n' + consoleEl.innerHTML;
+            }
+        } catch (err) {
+            consoleEl.innerHTML = '<span class="text-danger">Relay error: ' + err + '</span>\n' + consoleEl.innerHTML;
+        }
+    }
+
+    async function refreshCoinStatus() {
+        try {
+            const res = await fetch('/api/diagnostics/coin/status').then(r => r.json());
+            if (res) {
+                const pulsesEl = document.getElementById('statPulses');
+                const pesosEl = document.getElementById('statPesos');
+                if (pulsesEl) pulsesEl.innerText = res.total_pulses || 0;
+                if (pesosEl) pesosEl.innerText = res.total_pesos || 0;
+            }
+        } catch (e) {
+            console.error('Failed to refresh coin status:', e);
+        }
+    }
+
+    async function executePing() {
+        const target = document.getElementById('pingTarget').value.trim() || '8.8.8.8';
+        const consoleEl = document.getElementById('pingConsole');
+        const btn = document.getElementById('btnPing');
+
+        btn.disabled = true;
+        consoleEl.innerHTML = '<span class="text-warning">Pinging ' + target + '...</span>';
+
+        try {
+            const res = await fetch('/api/diagnostics/ping', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ target: target, count: 3 })
+            }).then(r => r.json());
+
+            if (res.success) {
+                consoleEl.innerHTML = '<span class="text-success fw-bold">✓ Ping Successful</span>\n'
+                    + 'Avg Latency: ' + (res.avg_latency_ms ? res.avg_latency_ms + ' ms' : 'N/A') + '\n'
+                    + 'Packet Loss: ' + res.packet_loss_pct + '%\n\n'
+                    + '<pre class="text-light mb-0">' + res.output + '</pre>';
+            } else {
+                consoleEl.innerHTML = '<span class="text-danger fw-bold">✗ Ping Failed</span>\n'
+                    + (res.error || 'Host unreachable') + '\n\n'
+                    + '<pre class="text-secondary mb-0">' + (res.output || '') + '</pre>';
+            }
+        } catch (err) {
+            consoleEl.innerHTML = '<span class="text-danger">Request error: ' + err + '</span>';
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    async function executeDns() {
+        const domain = document.getElementById('dnsDomain').value.trim() || 'google.com';
+        const consoleEl = document.getElementById('dnsConsole');
+        const btn = document.getElementById('btnDns');
+
+        btn.disabled = true;
+        consoleEl.innerHTML = '<span class="text-warning">Querying DNS for ' + domain + '...</span>';
+
+        try {
+            const res = await fetch('/api/diagnostics/dns', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ domain: domain })
+            }).then(r => r.json());
+
+            if (res.success) {
+                consoleEl.innerHTML = '<span class="text-success fw-bold">✓ Resolved ' + res.domain + ' in ' + res.duration_ms + 'ms</span>\n\n'
+                    + 'Resolved IP Addresses:\n'
+                    + res.resolved_ips.map(ip => '  • ' + ip).join('\n');
+            } else {
+                consoleEl.innerHTML = '<span class="text-danger fw-bold">✗ DNS Resolution Failed</span>\n\n'
+                    + (res.error || 'Unknown DNS failure');
+            }
+        } catch (err) {
+            consoleEl.innerHTML = '<span class="text-danger">Request error: ' + err + '</span>';
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    async function restartDaemon(daemonName) {
+        if (!confirm('Restart service ' + daemonName + '?')) return;
+        try {
+            const res = await fetch('/api/diagnostics/restart-daemon', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ service: daemonName })
+            }).then(r => r.json());
+
+            if (res.success) {
+                alert('Service ' + daemonName + ' restarted successfully.');
+                location.reload();
+            } else {
+                alert('Failed to restart ' + daemonName + ': ' + (res.error || res.output || 'Check server logs'));
+            }
+        } catch (err) {
+            alert('Request error: ' + err);
+        }
+    }
+</script>
+{% endblock %}

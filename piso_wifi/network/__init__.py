@@ -1,6 +1,7 @@
-"""Backward-compatibility facade for NetworkController.
+"""Network subsystem package for Piso-WiFi.
 
-Directs imports to the modern, modular piso_wifi.network subsystem.
+Exports core orchestrator and component managers for firewall, traffic shaping,
+access point management, client discovery, and command execution.
 """
 
 from piso_wifi.network.access_point import AccessPointManager
